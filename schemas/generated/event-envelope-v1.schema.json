@@ -1,0 +1,70 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "eventId": {
+      "title": "Eventid",
+      "type": "string"
+    },
+    "eventType": {
+      "title": "Eventtype",
+      "type": "string"
+    },
+    "eventVersion": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Eventversion",
+      "type": "string"
+    },
+    "tenantId": {
+      "exclusiveMinimum": 0,
+      "title": "Tenantid",
+      "type": "integer"
+    },
+    "traceId": {
+      "title": "Traceid",
+      "type": "string"
+    },
+    "taskId": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Taskid"
+    },
+    "runId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Runid"
+    },
+    "occurredAt": {
+      "format": "date-time",
+      "title": "Occurredat",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    }
+  },
+  "required": [
+    "eventType",
+    "tenantId",
+    "traceId",
+    "payload"
+  ],
+  "title": "EventEnvelope",
+  "type": "object"
+}

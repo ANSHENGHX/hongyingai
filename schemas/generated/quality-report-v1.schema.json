@@ -1,0 +1,173 @@
+{
+  "$defs": {
+    "QualityItem": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "severity": {
+          "enum": [
+            "INFO",
+            "WARNING",
+            "ERROR"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        },
+        "autoFixable": {
+          "default": false,
+          "title": "Autofixable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "passed",
+        "severity",
+        "message"
+      ],
+      "title": "QualityItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "policyVersion": {
+      "title": "Policyversion",
+      "type": "string"
+    },
+    "technical": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/QualityItem"
+      },
+      "title": "Technical",
+      "type": "array"
+    },
+    "visual": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/QualityItem"
+      },
+      "title": "Visual",
+      "type": "array"
+    },
+    "audio": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/QualityItem"
+      },
+      "title": "Audio",
+      "type": "array"
+    },
+    "subtitle": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/QualityItem"
+      },
+      "title": "Subtitle",
+      "type": "array"
+    },
+    "compliance": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/QualityItem"
+      },
+      "title": "Compliance",
+      "type": "array"
+    },
+    "business": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/QualityItem"
+      },
+      "title": "Business",
+      "type": "array"
+    },
+    "decision": {
+      "enum": [
+        "PASS",
+        "REJECT",
+        "MANUAL_REVIEW"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "revisionCount": {
+      "default": 0,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Revisioncount",
+      "type": "integer"
+    },
+    "createdAt": {
+      "format": "date-time",
+      "title": "Createdat",
+      "type": "string"
+    }
+  },
+  "required": [
+    "policyVersion",
+    "decision"
+  ],
+  "title": "QualityReport",
+  "type": "object"
+}

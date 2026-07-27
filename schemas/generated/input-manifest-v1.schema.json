@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "AssetManifestEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "assetId": {
+          "title": "Assetid",
+          "type": "string"
+        },
+        "objectKey": {
+          "title": "Objectkey",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "durationMs": {
+          "exclusiveMinimum": 0,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "sizeBytes": {
+          "exclusiveMinimum": 0,
+          "title": "Sizebytes",
+          "type": "integer"
+        },
+        "etag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Etag"
+        },
+        "licenseId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Licenseid"
+        },
+        "focusX": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focusx"
+        },
+        "focusY": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focusy"
+        }
+      },
+      "required": [
+        "assetId",
+        "objectKey",
+        "sha256",
+        "durationMs",
+        "sizeBytes"
+      ],
+      "title": "AssetManifestEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "tenantId": {
+      "exclusiveMinimum": 0,
+      "title": "Tenantid",
+      "type": "integer"
+    },
+    "assets": {
+      "items": {
+        "$ref": "#/$defs/AssetManifestEntry"
+      },
+      "title": "Assets",
+      "type": "array"
+    }
+  },
+  "required": [
+    "tenantId",
+    "assets"
+  ],
+  "title": "InputManifest",
+  "type": "object"
+}

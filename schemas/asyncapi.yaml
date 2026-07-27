@@ -1,0 +1,112 @@
+asyncapi: 3.0.0
+info:
+  title: 宏映AI Python平台事件契约
+  version: 1.0.0
+defaultContentType: application/json
+channels:
+  assetAnalyzeRequested:
+    address: ai.asset.analyze.requested
+    messages:
+      command:
+        $ref: '#/components/messages/AssetAnalyzeRequested'
+  planGenerateRequested:
+    address: ai.plan.generate.requested
+    messages:
+      command:
+        $ref: '#/components/messages/PlanGenerateRequested'
+  renderHigh:
+    address: video.render.high
+    messages:
+      command:
+        $ref: '#/components/messages/RenderRequested'
+  renderNormal:
+    address: video.render.normal
+    messages:
+      command:
+        $ref: '#/components/messages/RenderRequested'
+  qualityRequested:
+    address: video.quality.requested
+    messages:
+      command:
+        $ref: '#/components/messages/QualityRequested'
+  cancelRequested:
+    address: video.run.cancel.requested
+    messages:
+      command:
+        $ref: '#/components/messages/CancelRequested'
+operations:
+  consumeAssetAnalyze:
+    action: receive
+    channel:
+      $ref: '#/channels/assetAnalyzeRequested'
+  consumePlanGenerate:
+    action: receive
+    channel:
+      $ref: '#/channels/planGenerateRequested'
+  consumeRenderHigh:
+    action: receive
+    channel:
+      $ref: '#/channels/renderHigh'
+  consumeRenderNormal:
+    action: receive
+    channel:
+      $ref: '#/channels/renderNormal'
+  consumeQuality:
+    action: receive
+    channel:
+      $ref: '#/channels/qualityRequested'
+  consumeCancel:
+    action: receive
+    channel:
+      $ref: '#/channels/cancelRequested'
+components:
+  messages:
+    AssetAnalyzeRequested:
+      name: AI_ASSET_ANALYZE_REQUESTED
+      payload:
+        $ref: '#/components/schemas/BaseCommand'
+    PlanGenerateRequested:
+      name: AI_PLAN_GENERATE_REQUESTED
+      payload:
+        $ref: '#/components/schemas/BaseCommand'
+    RenderRequested:
+      name: VIDEO_RENDER_REQUESTED
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/BaseCommand'
+          - type: object
+            required: [runId, runNo, timeline, inputManifest, outputProfile]
+    QualityRequested:
+      name: VIDEO_QUALITY_REQUESTED
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/BaseCommand'
+          - type: object
+            required: [runId, outputObjectKey, expectedProfile, policyVersion]
+    CancelRequested:
+      name: VIDEO_RUN_CANCEL_REQUESTED
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/BaseCommand'
+          - type: object
+            required: [runId, reason, requestedBy]
+  schemas:
+    BaseCommand:
+      type: object
+      additionalProperties: true
+      required: [commandId, commandType, commandVersion, tenantId, traceId]
+      properties:
+        commandId:
+          type: string
+        commandType:
+          type: string
+        commandVersion:
+          const: '1.0'
+        tenantId:
+          type: integer
+          minimum: 1
+        traceId:
+          type: string
+        taskId:
+          type: integer
+          minimum: 1

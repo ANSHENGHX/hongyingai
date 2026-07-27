@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "OutputProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "default": 1080,
+          "maximum": 7680,
+          "minimum": 240,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "default": 1920,
+          "maximum": 7680,
+          "minimum": 240,
+          "title": "Height",
+          "type": "integer"
+        },
+        "fps": {
+          "default": 30,
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Fps",
+          "type": "integer"
+        },
+        "videoCodec": {
+          "default": "h264",
+          "enum": [
+            "h264",
+            "h265"
+          ],
+          "title": "Videocodec",
+          "type": "string"
+        },
+        "audioCodec": {
+          "const": "aac",
+          "default": "aac",
+          "title": "Audiocodec",
+          "type": "string"
+        },
+        "videoBitrateKbps": {
+          "default": 6000,
+          "maximum": 100000,
+          "minimum": 300,
+          "title": "Videobitratekbps",
+          "type": "integer"
+        },
+        "audioBitrateKbps": {
+          "default": 192,
+          "maximum": 512,
+          "minimum": 32,
+          "title": "Audiobitratekbps",
+          "type": "integer"
+        },
+        "preview": {
+          "default": false,
+          "title": "Preview",
+          "type": "boolean"
+        }
+      },
+      "title": "OutputProfile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "commandId": {
+      "title": "Commandid",
+      "type": "string"
+    },
+    "commandType": {
+      "const": "VIDEO_QUALITY_REQUESTED",
+      "default": "VIDEO_QUALITY_REQUESTED",
+      "title": "Commandtype",
+      "type": "string"
+    },
+    "commandVersion": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Commandversion",
+      "type": "string"
+    },
+    "tenantId": {
+      "title": "Tenantid",
+      "type": "integer"
+    },
+    "traceId": {
+      "title": "Traceid",
+      "type": "string"
+    },
+    "taskId": {
+      "title": "Taskid",
+      "type": "integer"
+    },
+    "runId": {
+      "title": "Runid",
+      "type": "string"
+    },
+    "outputObjectKey": {
+      "title": "Outputobjectkey",
+      "type": "string"
+    },
+    "expectedProfile": {
+      "$ref": "#/$defs/OutputProfile"
+    },
+    "policyVersion": {
+      "default": "quality-v1",
+      "title": "Policyversion",
+      "type": "string"
+    }
+  },
+  "required": [
+    "commandId",
+    "tenantId",
+    "traceId",
+    "taskId",
+    "runId",
+    "outputObjectKey",
+    "expectedProfile"
+  ],
+  "title": "QualityCommand",
+  "type": "object"
+}

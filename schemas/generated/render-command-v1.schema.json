@@ -1,0 +1,747 @@
+{
+  "$defs": {
+    "AssetManifestEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "assetId": {
+          "title": "Assetid",
+          "type": "string"
+        },
+        "objectKey": {
+          "title": "Objectkey",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "durationMs": {
+          "exclusiveMinimum": 0,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "sizeBytes": {
+          "exclusiveMinimum": 0,
+          "title": "Sizebytes",
+          "type": "integer"
+        },
+        "etag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Etag"
+        },
+        "licenseId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Licenseid"
+        },
+        "focusX": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focusx"
+        },
+        "focusY": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focusy"
+        }
+      },
+      "required": [
+        "assetId",
+        "objectKey",
+        "sha256",
+        "durationMs",
+        "sizeBytes"
+      ],
+      "title": "AssetManifestEntry",
+      "type": "object"
+    },
+    "Canvas": {
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "maximum": 7680,
+          "minimum": 240,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "maximum": 7680,
+          "minimum": 240,
+          "title": "Height",
+          "type": "integer"
+        },
+        "fps": {
+          "default": 30,
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Fps",
+          "type": "integer"
+        },
+        "background": {
+          "default": "#000000",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "title": "Background",
+          "type": "string"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "title": "Canvas",
+      "type": "object"
+    },
+    "Clip": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 96,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "assetId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Assetid",
+          "type": "string"
+        },
+        "timelineStartMs": {
+          "minimum": 0,
+          "title": "Timelinestartms",
+          "type": "integer"
+        },
+        "sourceInMs": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Sourceinms",
+          "type": "integer"
+        },
+        "sourceOutMs": {
+          "exclusiveMinimum": 0,
+          "title": "Sourceoutms",
+          "type": "integer"
+        },
+        "durationMs": {
+          "exclusiveMinimum": 0,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "volume": {
+          "default": 1,
+          "maximum": 4,
+          "minimum": 0,
+          "title": "Volume",
+          "type": "number"
+        },
+        "fadeInMs": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Fadeinms",
+          "type": "integer"
+        },
+        "fadeOutMs": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Fadeoutms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "assetId",
+        "timelineStartMs",
+        "sourceOutMs",
+        "durationMs"
+      ],
+      "title": "Clip",
+      "type": "object"
+    },
+    "Crop": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "default": 0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "default": 0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y",
+          "type": "number"
+        },
+        "width": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Width",
+          "type": "number"
+        },
+        "height": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Height",
+          "type": "number"
+        }
+      },
+      "title": "Crop",
+      "type": "object"
+    },
+    "InputManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "tenantId": {
+          "exclusiveMinimum": 0,
+          "title": "Tenantid",
+          "type": "integer"
+        },
+        "assets": {
+          "items": {
+            "$ref": "#/$defs/AssetManifestEntry"
+          },
+          "title": "Assets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "tenantId",
+        "assets"
+      ],
+      "title": "InputManifest",
+      "type": "object"
+    },
+    "OutputProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "default": 1080,
+          "maximum": 7680,
+          "minimum": 240,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "default": 1920,
+          "maximum": 7680,
+          "minimum": 240,
+          "title": "Height",
+          "type": "integer"
+        },
+        "fps": {
+          "default": 30,
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Fps",
+          "type": "integer"
+        },
+        "videoCodec": {
+          "default": "h264",
+          "enum": [
+            "h264",
+            "h265"
+          ],
+          "title": "Videocodec",
+          "type": "string"
+        },
+        "audioCodec": {
+          "const": "aac",
+          "default": "aac",
+          "title": "Audiocodec",
+          "type": "string"
+        },
+        "videoBitrateKbps": {
+          "default": 6000,
+          "maximum": 100000,
+          "minimum": 300,
+          "title": "Videobitratekbps",
+          "type": "integer"
+        },
+        "audioBitrateKbps": {
+          "default": 192,
+          "maximum": 512,
+          "minimum": 32,
+          "title": "Audiobitratekbps",
+          "type": "integer"
+        },
+        "preview": {
+          "default": false,
+          "title": "Preview",
+          "type": "boolean"
+        }
+      },
+      "title": "OutputProfile",
+      "type": "object"
+    },
+    "SubtitleCue": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "startMs": {
+          "minimum": 0,
+          "title": "Startms",
+          "type": "integer"
+        },
+        "endMs": {
+          "exclusiveMinimum": 0,
+          "title": "Endms",
+          "type": "integer"
+        },
+        "text": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "translation": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation"
+        },
+        "style": {
+          "$ref": "#/$defs/SubtitleStyle"
+        }
+      },
+      "required": [
+        "id",
+        "startMs",
+        "endMs",
+        "text"
+      ],
+      "title": "SubtitleCue",
+      "type": "object"
+    },
+    "SubtitleStyle": {
+      "additionalProperties": false,
+      "properties": {
+        "font": {
+          "default": "Noto Sans CJK SC",
+          "title": "Font",
+          "type": "string"
+        },
+        "fontSize": {
+          "default": 48,
+          "maximum": 160,
+          "minimum": 16,
+          "title": "Fontsize",
+          "type": "integer"
+        },
+        "color": {
+          "default": "#FFFFFF",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "title": "Color",
+          "type": "string"
+        },
+        "outlineColor": {
+          "default": "#000000",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "title": "Outlinecolor",
+          "type": "string"
+        },
+        "outlineWidth": {
+          "default": 2,
+          "maximum": 12,
+          "minimum": 0,
+          "title": "Outlinewidth",
+          "type": "integer"
+        },
+        "positionY": {
+          "default": 0.82,
+          "maximum": 0.95,
+          "minimum": 0.05,
+          "title": "Positiony",
+          "type": "number"
+        },
+        "maxLines": {
+          "default": 2,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Maxlines",
+          "type": "integer"
+        },
+        "highlightMode": {
+          "default": "none",
+          "enum": [
+            "none",
+            "word"
+          ],
+          "title": "Highlightmode",
+          "type": "string"
+        }
+      },
+      "title": "SubtitleStyle",
+      "type": "object"
+    },
+    "Timeline": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "durationMs": {
+          "exclusiveMinimum": 0,
+          "maximum": 90000,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "canvas": {
+          "$ref": "#/$defs/Canvas"
+        },
+        "tracks": {
+          "items": {
+            "$ref": "#/$defs/Track"
+          },
+          "title": "Tracks",
+          "type": "array"
+        },
+        "transitions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Transition"
+          },
+          "title": "Transitions",
+          "type": "array"
+        },
+        "subtitles": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SubtitleCue"
+          },
+          "title": "Subtitles",
+          "type": "array"
+        },
+        "output": {
+          "$ref": "#/$defs/OutputProfile"
+        }
+      },
+      "required": [
+        "durationMs",
+        "canvas",
+        "tracks"
+      ],
+      "title": "Timeline",
+      "type": "object"
+    },
+    "Track": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 96,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/TrackType"
+        },
+        "clips": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Clip"
+          },
+          "title": "Clips",
+          "type": "array"
+        },
+        "muted": {
+          "default": false,
+          "title": "Muted",
+          "type": "boolean"
+        },
+        "zIndex": {
+          "default": 0,
+          "maximum": 32,
+          "minimum": 0,
+          "title": "Zindex",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "title": "Track",
+      "type": "object"
+    },
+    "TrackType": {
+      "enum": [
+        "video",
+        "overlay",
+        "audio",
+        "subtitle"
+      ],
+      "title": "TrackType",
+      "type": "string"
+    },
+    "Transform": {
+      "additionalProperties": false,
+      "properties": {
+        "crop": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Crop"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rotation": {
+          "default": 0,
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ],
+          "title": "Rotation",
+          "type": "integer"
+        },
+        "scaleMode": {
+          "default": "fill",
+          "enum": [
+            "fit",
+            "fill",
+            "stretch",
+            "blur"
+          ],
+          "title": "Scalemode",
+          "type": "string"
+        },
+        "speed": {
+          "default": 1,
+          "maximum": 4,
+          "minimum": 0.25,
+          "title": "Speed",
+          "type": "number"
+        },
+        "opacity": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "brightness": {
+          "default": 0,
+          "maximum": 1,
+          "minimum": -1,
+          "title": "Brightness",
+          "type": "number"
+        },
+        "contrast": {
+          "default": 1,
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Contrast",
+          "type": "number"
+        },
+        "saturation": {
+          "default": 1,
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Saturation",
+          "type": "number"
+        },
+        "freezeAtMs": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Freezeatms"
+        }
+      },
+      "title": "Transform",
+      "type": "object"
+    },
+    "Transition": {
+      "additionalProperties": false,
+      "properties": {
+        "fromClipId": {
+          "title": "Fromclipid",
+          "type": "string"
+        },
+        "toClipId": {
+          "title": "Toclipid",
+          "type": "string"
+        },
+        "type": {
+          "default": "cut",
+          "enum": [
+            "cut",
+            "crossfade",
+            "fade",
+            "slide",
+            "zoom"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "durationMs": {
+          "default": 0,
+          "maximum": 3000,
+          "minimum": 0,
+          "title": "Durationms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "fromClipId",
+        "toClipId"
+      ],
+      "title": "Transition",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "commandId": {
+      "title": "Commandid",
+      "type": "string"
+    },
+    "commandType": {
+      "const": "VIDEO_RENDER_REQUESTED",
+      "default": "VIDEO_RENDER_REQUESTED",
+      "title": "Commandtype",
+      "type": "string"
+    },
+    "commandVersion": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Commandversion",
+      "type": "string"
+    },
+    "tenantId": {
+      "title": "Tenantid",
+      "type": "integer"
+    },
+    "traceId": {
+      "title": "Traceid",
+      "type": "string"
+    },
+    "taskId": {
+      "title": "Taskid",
+      "type": "integer"
+    },
+    "runId": {
+      "title": "Runid",
+      "type": "string"
+    },
+    "runNo": {
+      "minimum": 1,
+      "title": "Runno",
+      "type": "integer"
+    },
+    "timeline": {
+      "$ref": "#/$defs/Timeline"
+    },
+    "inputManifest": {
+      "$ref": "#/$defs/InputManifest"
+    },
+    "outputProfile": {
+      "$ref": "#/$defs/OutputProfile"
+    },
+    "priority": {
+      "default": "normal",
+      "enum": [
+        "high",
+        "normal"
+      ],
+      "title": "Priority",
+      "type": "string"
+    },
+    "deadline": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deadline"
+    }
+  },
+  "required": [
+    "commandId",
+    "tenantId",
+    "traceId",
+    "taskId",
+    "runId",
+    "runNo",
+    "timeline",
+    "inputManifest",
+    "outputProfile"
+  ],
+  "title": "RenderCommand",
+  "type": "object"
+}

@@ -1,0 +1,83 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "commandId": {
+      "title": "Commandid",
+      "type": "string"
+    },
+    "commandType": {
+      "const": "AI_ASSET_ANALYZE_REQUESTED",
+      "default": "AI_ASSET_ANALYZE_REQUESTED",
+      "title": "Commandtype",
+      "type": "string"
+    },
+    "commandVersion": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Commandversion",
+      "type": "string"
+    },
+    "tenantId": {
+      "title": "Tenantid",
+      "type": "integer"
+    },
+    "traceId": {
+      "title": "Traceid",
+      "type": "string"
+    },
+    "taskId": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Taskid"
+    },
+    "materialVersion": {
+      "title": "Materialversion",
+      "type": "string"
+    },
+    "assetId": {
+      "title": "Assetid",
+      "type": "string"
+    },
+    "objectKey": {
+      "title": "Objectkey",
+      "type": "string"
+    },
+    "sha256": {
+      "title": "Sha256",
+      "type": "string"
+    },
+    "sizeBytes": {
+      "title": "Sizebytes",
+      "type": "integer"
+    },
+    "analysisProfile": {
+      "default": "STANDARD",
+      "enum": [
+        "FAST",
+        "STANDARD",
+        "DEEP"
+      ],
+      "title": "Analysisprofile",
+      "type": "string"
+    }
+  },
+  "required": [
+    "commandId",
+    "tenantId",
+    "traceId",
+    "materialVersion",
+    "assetId",
+    "objectKey",
+    "sha256",
+    "sizeBytes"
+  ],
+  "title": "AssetAnalyzeCommand",
+  "type": "object"
+}

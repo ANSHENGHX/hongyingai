@@ -1,0 +1,60 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "commandId": {
+      "title": "Commandid",
+      "type": "string"
+    },
+    "commandType": {
+      "const": "VIDEO_RUN_CANCEL_REQUESTED",
+      "default": "VIDEO_RUN_CANCEL_REQUESTED",
+      "title": "Commandtype",
+      "type": "string"
+    },
+    "commandVersion": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Commandversion",
+      "type": "string"
+    },
+    "tenantId": {
+      "title": "Tenantid",
+      "type": "integer"
+    },
+    "traceId": {
+      "title": "Traceid",
+      "type": "string"
+    },
+    "taskId": {
+      "title": "Taskid",
+      "type": "integer"
+    },
+    "runId": {
+      "title": "Runid",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "requestedBy": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Requestedby",
+      "type": "string"
+    }
+  },
+  "required": [
+    "commandId",
+    "tenantId",
+    "traceId",
+    "taskId",
+    "runId",
+    "reason",
+    "requestedBy"
+  ],
+  "title": "CancelCommand",
+  "type": "object"
+}

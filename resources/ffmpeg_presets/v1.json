@@ -1,0 +1,20 @@
+{
+  "version": "v1",
+  "preview": {
+    "videoCodec": "h264",
+    "preset": "veryfast",
+    "videoBitrateKbps": 1600,
+    "audioBitrateKbps": 96,
+    "pixelFormat": "yuv420p",
+    "faststart": true
+  },
+  "delivery": {
+    "videoCodec": "h264",
+    "preset": "medium",
+    "videoBitrateKbps": 6000,
+    "audioBitrateKbps": 192,
+    "pixelFormat": "yuv420p",
+    "faststart": true
+  }
+}
+

@@ -1,0 +1,304 @@
+{
+  "$defs": {
+    "AssetManifestEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "assetId": {
+          "title": "Assetid",
+          "type": "string"
+        },
+        "objectKey": {
+          "title": "Objectkey",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "durationMs": {
+          "exclusiveMinimum": 0,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "sizeBytes": {
+          "exclusiveMinimum": 0,
+          "title": "Sizebytes",
+          "type": "integer"
+        },
+        "etag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Etag"
+        },
+        "licenseId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Licenseid"
+        },
+        "focusX": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focusx"
+        },
+        "focusY": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focusy"
+        }
+      },
+      "required": [
+        "assetId",
+        "objectKey",
+        "sha256",
+        "durationMs",
+        "sizeBytes"
+      ],
+      "title": "AssetManifestEntry",
+      "type": "object"
+    },
+    "InputManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "tenantId": {
+          "exclusiveMinimum": 0,
+          "title": "Tenantid",
+          "type": "integer"
+        },
+        "assets": {
+          "items": {
+            "$ref": "#/$defs/AssetManifestEntry"
+          },
+          "title": "Assets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "tenantId",
+        "assets"
+      ],
+      "title": "InputManifest",
+      "type": "object"
+    },
+    "TaskConstraints": {
+      "additionalProperties": false,
+      "properties": {
+        "durationMs": {
+          "default": 30000,
+          "maximum": 90000,
+          "minimum": 15000,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "width": {
+          "default": 1080,
+          "maximum": 7680,
+          "minimum": 240,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "default": 1920,
+          "maximum": 7680,
+          "minimum": 240,
+          "title": "Height",
+          "type": "integer"
+        },
+        "language": {
+          "default": "zh-CN",
+          "maxLength": 16,
+          "title": "Language",
+          "type": "string"
+        },
+        "maxModelCalls": {
+          "default": 8,
+          "maximum": 20,
+          "minimum": 0,
+          "title": "Maxmodelcalls",
+          "type": "integer"
+        },
+        "maxTokens": {
+          "default": 12000,
+          "maximum": 100000,
+          "minimum": 0,
+          "title": "Maxtokens",
+          "type": "integer"
+        },
+        "maxCostUsd": {
+          "default": 2,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Maxcostusd",
+          "type": "number"
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deadline"
+        }
+      },
+      "title": "TaskConstraints",
+      "type": "object"
+    },
+    "TaskSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "taskId": {
+          "exclusiveMinimum": 0,
+          "title": "Taskid",
+          "type": "integer"
+        },
+        "tenantId": {
+          "exclusiveMinimum": 0,
+          "title": "Tenantid",
+          "type": "integer"
+        },
+        "templateVersion": {
+          "default": "default-v1",
+          "maxLength": 64,
+          "title": "Templateversion",
+          "type": "string"
+        },
+        "materialVersions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Materialversions",
+          "type": "array"
+        },
+        "constraints": {
+          "$ref": "#/$defs/TaskConstraints"
+        },
+        "billingRef": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Billingref"
+        }
+      },
+      "required": [
+        "taskId",
+        "tenantId"
+      ],
+      "title": "TaskSnapshot",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "commandId": {
+      "title": "Commandid",
+      "type": "string"
+    },
+    "commandType": {
+      "const": "AI_PLAN_GENERATE_REQUESTED",
+      "default": "AI_PLAN_GENERATE_REQUESTED",
+      "title": "Commandtype",
+      "type": "string"
+    },
+    "commandVersion": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Commandversion",
+      "type": "string"
+    },
+    "tenantId": {
+      "title": "Tenantid",
+      "type": "integer"
+    },
+    "traceId": {
+      "title": "Traceid",
+      "type": "string"
+    },
+    "taskSnapshot": {
+      "$ref": "#/$defs/TaskSnapshot"
+    },
+    "userGoal": {
+      "title": "Usergoal",
+      "type": "string"
+    },
+    "industry": {
+      "title": "Industry",
+      "type": "string"
+    },
+    "brandKnowledge": {
+      "additionalProperties": true,
+      "title": "Brandknowledge",
+      "type": "object"
+    },
+    "candidateAssets": {
+      "$ref": "#/$defs/InputManifest"
+    }
+  },
+  "required": [
+    "commandId",
+    "tenantId",
+    "traceId",
+    "taskSnapshot",
+    "userGoal",
+    "industry",
+    "candidateAssets"
+  ],
+  "title": "PlanGenerateCommand",
+  "type": "object"
+}

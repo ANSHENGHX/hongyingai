@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "TaskConstraints": {
+      "additionalProperties": false,
+      "properties": {
+        "durationMs": {
+          "default": 30000,
+          "maximum": 90000,
+          "minimum": 15000,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "width": {
+          "default": 1080,
+          "maximum": 7680,
+          "minimum": 240,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "default": 1920,
+          "maximum": 7680,
+          "minimum": 240,
+          "title": "Height",
+          "type": "integer"
+        },
+        "language": {
+          "default": "zh-CN",
+          "maxLength": 16,
+          "title": "Language",
+          "type": "string"
+        },
+        "maxModelCalls": {
+          "default": 8,
+          "maximum": 20,
+          "minimum": 0,
+          "title": "Maxmodelcalls",
+          "type": "integer"
+        },
+        "maxTokens": {
+          "default": 12000,
+          "maximum": 100000,
+          "minimum": 0,
+          "title": "Maxtokens",
+          "type": "integer"
+        },
+        "maxCostUsd": {
+          "default": 2,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Maxcostusd",
+          "type": "number"
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deadline"
+        }
+      },
+      "title": "TaskConstraints",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "taskId": {
+      "exclusiveMinimum": 0,
+      "title": "Taskid",
+      "type": "integer"
+    },
+    "tenantId": {
+      "exclusiveMinimum": 0,
+      "title": "Tenantid",
+      "type": "integer"
+    },
+    "templateVersion": {
+      "default": "default-v1",
+      "maxLength": 64,
+      "title": "Templateversion",
+      "type": "string"
+    },
+    "materialVersions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Materialversions",
+      "type": "array"
+    },
+    "constraints": {
+      "$ref": "#/$defs/TaskConstraints"
+    },
+    "billingRef": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Billingref"
+    }
+  },
+  "required": [
+    "taskId",
+    "tenantId"
+  ],
+  "title": "TaskSnapshot",
+  "type": "object"
+}
