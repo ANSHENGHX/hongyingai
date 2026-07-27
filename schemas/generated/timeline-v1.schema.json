@@ -445,6 +445,32 @@
           ],
           "default": null,
           "title": "Freezeatms"
+        },
+        "position": {
+          "default": "center",
+          "enum": [
+            "center",
+            "top_left",
+            "top_right",
+            "bottom_left",
+            "bottom_right"
+          ],
+          "title": "Position",
+          "type": "string"
+        },
+        "overlayScale": {
+          "default": 0.2,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Overlayscale",
+          "type": "number"
+        },
+        "margin": {
+          "default": 32,
+          "maximum": 500,
+          "minimum": 0,
+          "title": "Margin",
+          "type": "integer"
         }
       },
       "title": "Transform",

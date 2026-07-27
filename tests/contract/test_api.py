@@ -61,6 +61,16 @@ def test_liveness_does_not_require_internal_headers(tmp_path: Path) -> None:
     assert response.json()["status"] == "UP"
 
 
+def test_studio_frontend_and_template_api_are_available(tmp_path: Path) -> None:
+    with app_client(tmp_path) as client:
+        page = client.get("/studio")
+        templates = client.get("/internal/v1/studio/templates", headers=headers())
+    assert page.status_code == 200
+    assert "一键生成视频" in page.text
+    assert templates.status_code == 200
+    assert len(templates.json()["data"]["templates"]) >= 3
+
+
 def test_timeline_validation_contract(tmp_path: Path, timeline, manifest) -> None:
     payload: dict[str, Any] = {
         "schemaVersion": "1.0",
@@ -87,3 +97,16 @@ def test_unknown_service_is_rejected(tmp_path: Path, timeline) -> None:
     assert response.status_code == 422
     assert response.json()["code"] == "AI_INVALID_COMMAND"
 
+
+def test_generated_request_id_is_consistent_between_header_and_body(
+    tmp_path: Path, timeline
+) -> None:
+    payload = {
+        "schemaVersion": "1.0",
+        "taskId": 90001,
+        "timeline": timeline.model_dump(by_alias=True, mode="json"),
+    }
+    denied = headers() | {"X-Service-Name": "unknown-service"}
+    with app_client(tmp_path) as client:
+        response = client.post("/internal/v1/timelines/validate", headers=denied, json=payload)
+    assert response.headers["X-Request-Id"] == response.json()["requestId"]

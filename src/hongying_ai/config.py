@@ -34,9 +34,10 @@ class Settings(BaseSettings):
     rabbitmq_vhost: str = "/"
 
     minio_endpoint: str = "http://127.0.0.1:9000"
+    minio_console_endpoint: str = "http://127.0.0.1:9003"
     minio_access_key: str = ""
     minio_secret_key: str = ""
-    minio_bucket: str = "ai-platform"
+    minio_bucket: str = "hongying"
     minio_secure: bool = False
 
     deepseek_base_url: str = "https://api.deepseek.com"
@@ -56,6 +57,8 @@ class Settings(BaseSettings):
     heartbeat_seconds: int = 15
     max_attempts: int = 3
     environment_object_prefix: str = "prod"
+    studio_direct_execution: bool = True
+    studio_max_upload_bytes: int = 2 * 1024 * 1024 * 1024
 
     @field_validator("worker_kind")
     @classmethod

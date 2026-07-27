@@ -80,6 +80,11 @@ class Transform(ContractModel):
     contrast: float = Field(default=1, ge=0, le=3)
     saturation: float = Field(default=1, ge=0, le=3)
     freeze_at_ms: int | None = Field(default=None, ge=0)
+    position: Literal[
+        "center", "top_left", "top_right", "bottom_left", "bottom_right"
+    ] = "center"
+    overlay_scale: float = Field(default=0.2, gt=0, le=1)
+    margin: int = Field(default=32, ge=0, le=500)
 
 
 class Clip(ContractModel):
@@ -179,12 +184,23 @@ class AssetManifestEntry(ContractModel):
     license_id: str | None = None
     focus_x: float | None = Field(default=None, ge=0, le=1)
     focus_y: float | None = Field(default=None, ge=0, le=1)
+    media_type: Literal["video", "image", "audio"] = "video"
+    has_audio: bool = True
+    labels: tuple[str, ...] = ()
+    quality_score: float | None = Field(default=None, ge=0, le=100)
 
 
 class InputManifest(ContractModel):
     schema_version: Literal["1.0"] = "1.0"
     tenant_id: int = Field(gt=0)
     assets: tuple[AssetManifestEntry, ...]
+
+    @model_validator(mode="after")
+    def unique_assets(self) -> InputManifest:
+        ids = [asset.asset_id for asset in self.assets]
+        if len(ids) != len(set(ids)):
+            raise ValueError("assetId must be unique in InputManifest")
+        return self
 
     def by_id(self) -> dict[str, AssetManifestEntry]:
         return {asset.asset_id: asset for asset in self.assets}
@@ -230,6 +246,8 @@ class MediaProfile(ContractModel):
     size_bytes: int
     risk_flags: tuple[str, ...] = ()
     analyzer_version: str = "probe-v1"
+    media_type: Literal["video", "image", "audio"] = "video"
+    bitrate_kbps: int | None = None
 
 
 class CreativeBrief(ContractModel):
@@ -301,4 +319,3 @@ class RenderRun(ContractModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-

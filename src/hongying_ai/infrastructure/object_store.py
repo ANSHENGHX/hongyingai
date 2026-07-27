@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,44 @@ class MinioObjectStore:
         exists = await asyncio.to_thread(self.client.bucket_exists, self.bucket)
         if not exists:
             await asyncio.to_thread(self.client.make_bucket, self.bucket)
+
+    async def list(self, prefix: str) -> list[dict[str, Any]]:
+        try:
+            values = await asyncio.to_thread(
+                lambda: list(self.client.list_objects(self.bucket, prefix=prefix, recursive=True))
+            )
+            return [
+                {
+                    "objectKey": value.object_name,
+                    "size": value.size,
+                    "etag": value.etag,
+                    "lastModified": (
+                        value.last_modified.isoformat() if value.last_modified else None
+                    ),
+                }
+                for value in values
+            ]
+        except S3Error as exc:
+            raise PlatformError(
+                ErrorCode.OBJECT_STORE_UNAVAILABLE,
+                f"列举对象失败: {prefix}",
+                retryable=True,
+            ) from exc
+
+    async def presigned_get(self, object_key: str, expires_seconds: int = 3600) -> str:
+        try:
+            return await asyncio.to_thread(
+                self.client.presigned_get_object,
+                self.bucket,
+                object_key,
+                expires=timedelta(seconds=max(60, min(expires_seconds, 86400))),
+            )
+        except S3Error as exc:
+            raise PlatformError(
+                ErrorCode.OBJECT_STORE_UNAVAILABLE,
+                f"生成对象访问地址失败: {object_key}",
+                retryable=True,
+            ) from exc
 
     async def download(self, object_key: str, destination: Path) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)

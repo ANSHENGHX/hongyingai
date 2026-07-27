@@ -11,6 +11,7 @@ from hongying_ai.contracts.events import (
     QualityCommand,
     RenderCommand,
 )
+from hongying_ai.contracts.studio import StudioGenerateRequest
 from hongying_ai.domain.models import InputManifest, QualityReport, TaskSnapshot, Timeline
 
 
@@ -28,6 +29,7 @@ def main() -> None:
         "render-command-v1": RenderCommand,
         "quality-command-v1": QualityCommand,
         "cancel-command-v1": CancelCommand,
+        "studio-generate-request-v1": StudioGenerateRequest,
     }
     for filename, model in models.items():
         path = output / f"{filename}.schema.json"

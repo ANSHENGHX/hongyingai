@@ -13,6 +13,7 @@ PROGRESS_PATTERN = re.compile(r"out_time_ms=(\d+)")
 BLACK_PATTERN = re.compile(r"black_duration:(?P<duration>[0-9.]+)")
 SILENCE_PATTERN = re.compile(r"silence_duration: (?P<duration>[0-9.]+)")
 FREEZE_PATTERN = re.compile(r"freeze_duration: (?P<duration>[0-9.]+)")
+SCENE_PATTERN = re.compile(r"pts_time:(?P<seconds>[0-9.]+)")
 
 
 class FfmpegRunner:
@@ -42,6 +43,15 @@ class FfmpegRunner:
         return json.loads(stdout)
 
     async def scan_quality(self, path: Path) -> dict[str, Any]:
+        probe = await self.probe(path)
+        has_audio = any(
+            stream.get("codec_type") == "audio" for stream in probe.get("streams", [])
+        )
+        filter_graph = "[0:v]blackdetect=d=0.5:pix_th=0.10,freezedetect=n=-60dB:d=2[v]"
+        maps = ["-map", "[v]"]
+        if has_audio:
+            filter_graph += ";[0:a]silencedetect=n=-50dB:d=1[a]"
+            maps.extend(["-map", "[a]"])
         args = [
             self.ffmpeg_path,
             "-nostdin",
@@ -51,12 +61,8 @@ class FfmpegRunner:
             "-i",
             str(path),
             "-filter_complex",
-            "[0:v]blackdetect=d=0.5:pix_th=0.10,freezedetect=n=-60dB:d=2[v];"
-            "[0:a]silencedetect=n=-50dB:d=1[a]",
-            "-map",
-            "[v]",
-            "-map",
-            "[a]",
+            filter_graph,
+            *maps,
             "-f",
             "null",
             "-",
@@ -74,6 +80,34 @@ class FfmpegRunner:
             "silenceSeconds": sum(float(m.group("duration")) for m in SILENCE_PATTERN.finditer(text)),
             "freezeSeconds": sum(float(m.group("duration")) for m in FREEZE_PATTERN.finditer(text)),
         }
+
+    async def detect_scenes(self, source: Path, duration_ms: int) -> list[int]:
+        process = await asyncio.create_subprocess_exec(
+            self.ffmpeg_path,
+            "-nostdin",
+            "-hide_banner",
+            "-v",
+            "info",
+            "-i",
+            str(source),
+            "-vf",
+            "select='gt(scene,0.32)',showinfo",
+            "-an",
+            "-f",
+            "null",
+            "-",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+        if process.returncode != 0:
+            return [0, duration_ms]
+        boundaries = {0, duration_ms}
+        for match in SCENE_PATTERN.finditer(stderr.decode("utf-8", errors="replace")):
+            milliseconds = round(float(match.group("seconds")) * 1000)
+            if 300 <= milliseconds <= duration_ms - 300:
+                boundaries.add(milliseconds)
+        return sorted(boundaries)
 
     async def create_thumbnail(
         self, source: Path, destination: Path, at_seconds: float
@@ -114,7 +148,7 @@ class FfmpegRunner:
                 "-i",
                 str(source),
                 "-vf",
-                "scale='min(1280,iw)':-2,fps=30,format=yuv420p",
+                "scale=-2:'min(480,ih)',fps=30,format=yuv420p",
                 "-c:v",
                 "libx264",
                 "-preset",

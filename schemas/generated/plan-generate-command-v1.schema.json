@@ -77,6 +77,43 @@
           ],
           "default": null,
           "title": "Focusy"
+        },
+        "mediaType": {
+          "default": "video",
+          "enum": [
+            "video",
+            "image",
+            "audio"
+          ],
+          "title": "Mediatype",
+          "type": "string"
+        },
+        "hasAudio": {
+          "default": true,
+          "title": "Hasaudio",
+          "type": "boolean"
+        },
+        "labels": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Labels",
+          "type": "array"
+        },
+        "qualityScore": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Qualityscore"
         }
       },
       "required": [

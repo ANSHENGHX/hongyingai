@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="宏映AI一键视频制作台">
+    <title>宏映AI · 一键成片</title>
+    <link rel="stylesheet" href="/studio/static/app.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/studio" aria-label="宏映AI首页">
+        <span class="brand-mark">HY</span>
+        <span>宏映AI</span>
+        <small>一键成片</small>
+      </a>
+      <div class="runtime">
+        <span class="status-dot"></span>
+        <span>AI 视频工作流已连接</span>
+        <label>租户 <input id="tenantId" value="10001" inputmode="numeric" aria-label="租户ID"></label>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">HONGYING AI VIDEO STUDIO</p>
+          <h1>从素材到作品，<br><em>一次点击。</em></h1>
+          <p class="hero-copy">选择商户、活动、模板和素材。系统会完成创意规划、智能匹配、视频合成与质量检测。</p>
+        </div>
+        <ol class="flow" aria-label="生成流程">
+          <li><span>01</span>创意规划</li>
+          <li><span>02</span>素材匹配</li>
+          <li><span>03</span>视频合成</li>
+          <li><span>04</span>质量检测</li>
+        </ol>
+      </section>
+
+      <section class="workspace">
+        <form id="studioForm">
+          <article class="panel">
+            <div class="panel-heading">
+              <span class="step">01</span>
+              <div><h2>商户与活动</h2><p>告诉 AI 这条视频为谁、为什么而做。</p></div>
+            </div>
+            <div class="field-grid">
+              <label>商户名称<input id="merchantName" required placeholder="例如：蜀香里火锅"></label>
+              <label>商户编号<input id="merchantId" required placeholder="例如：M10086"></label>
+              <label>活动名称<input id="activityTitle" required placeholder="例如：夏日双人餐限时活动"></label>
+              <label>活动编号<input id="activityId" required placeholder="例如：ACT202607"></label>
+              <label>活动类型
+                <select id="activityType">
+                  <option>餐饮促销</option>
+                  <option>新品上市</option>
+                  <option>门店探店</option>
+                  <option>节日活动</option>
+                  <option>品牌宣传</option>
+                </select>
+              </label>
+              <label class="wide">制作目标<textarea id="userGoal" required placeholder="突出锅底和招牌菜，吸引附近顾客到店购买双人套餐。"></textarea></label>
+              <label class="wide">核心卖点<input id="sellingPoints" placeholder="用逗号分隔，例如：现切鲜肉, 手工锅底, 双人套餐"></label>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span class="step">02</span>
+              <div><h2>选择视频模板</h2><p>模板决定节奏、画幅、转场与字幕风格。</p></div>
+            </div>
+            <div id="templateList" class="template-list" aria-live="polite">
+              <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span class="step">03</span>
+              <div><h2>选择素材</h2><p>上传图片、视频、Logo 或 BGM，解析完成后即可勾选。</p></div>
+              <label class="upload-button">
+                <input id="assetUpload" type="file" multiple accept="image/*,video/*,audio/*">
+                ＋ 上传素材
+              </label>
+            </div>
+            <div id="uploadState" class="upload-state" hidden></div>
+            <div id="assetList" class="asset-list" aria-live="polite">
+              <div class="empty">正在读取素材库…</div>
+            </div>
+            <div class="role-fields">
+              <label>Logo（可选）<select id="logoAsset"><option value="">不添加 Logo</option></select></label>
+              <label>BGM（可选）<select id="bgmAsset"><option value="">使用素材原声</option></select></label>
+            </div>
+          </article>
+
+          <article class="launch-panel">
+            <div>
+              <p class="eyebrow">READY TO CREATE</p>
+              <h2>让素材变成可发布的作品</h2>
+              <p>提交后可离开本页，任务状态会保存在运行记录中。</p>
+            </div>
+            <button id="generateButton" class="primary-button" type="submit">
+              <span>一键生成视频</span><b>→</b>
+            </button>
+          </article>
+        </form>
+
+        <aside id="resultPanel" class="result-panel" aria-live="polite">
+          <div class="result-empty">
+            <div class="film-icon">▶</div>
+            <h2>作品将在这里生成</h2>
+            <p>完成左侧四步后，一键启动完整视频工作流。</p>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script src="/studio/static/app.js" defer></script>
+  </body>
+</html>

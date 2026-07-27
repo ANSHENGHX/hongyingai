@@ -64,11 +64,24 @@ components:
     AssetAnalyzeRequested:
       name: AI_ASSET_ANALYZE_REQUESTED
       payload:
-        $ref: '#/components/schemas/BaseCommand'
+        allOf:
+          - $ref: '#/components/schemas/BaseCommand'
+          - type: object
+            required: [materialVersion, assetId, objectKey, sha256, sizeBytes, analysisProfile]
+            properties:
+              materialVersion: { type: string }
+              assetId: { type: string }
+              objectKey: { type: string }
+              sha256: { type: string, pattern: '^[0-9a-fA-F]{64}$' }
+              sizeBytes: { type: integer, minimum: 1 }
+              analysisProfile: { enum: [FAST, STANDARD, DEEP] }
     PlanGenerateRequested:
       name: AI_PLAN_GENERATE_REQUESTED
       payload:
-        $ref: '#/components/schemas/BaseCommand'
+        allOf:
+          - $ref: '#/components/schemas/BaseCommand'
+          - type: object
+            required: [taskSnapshot, userGoal, industry, candidateAssets]
     RenderRequested:
       name: VIDEO_RENDER_REQUESTED
       payload:

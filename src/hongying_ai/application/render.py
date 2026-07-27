@@ -49,12 +49,6 @@ class RenderService:
     async def execute(self, command: RenderCommand) -> tuple[RenderRun, QualityReport]:
         started_at = time.perf_counter()
         idempotency = f"{command.command_type}:{command.task_id}:{command.run_no}"
-        if not await self.coordination.claim_command(idempotency):
-            existing = await self.repository.get(command.run_id, command.tenant_id)
-            if existing and existing.stage == RunStage.COMPLETED:
-                quality = QualityReport.model_validate(existing.metadata["qualityReport"])
-                return existing, quality
-            raise PlatformError(ErrorCode.INVALID_COMMAND, "重复的渲染命令正在执行")
         issues = validate_timeline(command.timeline, command.input_manifest)
         if issues:
             raise TimelineInvalid("Timeline 校验失败", [item.to_dict() for item in issues])
@@ -66,13 +60,21 @@ class RenderService:
         free_bytes = shutil.disk_usage(self.settings.app_work_dir.resolve()).free
         if input_bytes * 2 > free_bytes:
             raise PlatformError(ErrorCode.RESOURCE_EXHAUSTED, "Worker 可用磁盘不足", True)
+        if not await self.coordination.claim_command(idempotency):
+            existing = await self.repository.get(command.run_id, command.tenant_id)
+            if existing and existing.stage == RunStage.COMPLETED:
+                quality = QualityReport.model_validate(existing.metadata["qualityReport"])
+                return existing, quality
+            raise PlatformError(ErrorCode.INVALID_COMMAND, "重复的渲染命令正在执行")
 
         worker_id = f"{socket.gethostname()}:{self.settings.worker_kind}"
         if not await self.coordination.acquire_lease(
             command.run_id, worker_id, self.settings.lease_seconds
         ):
+            await self.coordination.release_command(idempotency)
             raise PlatformError(ErrorCode.RESOURCE_EXHAUSTED, "Run 已被其他 Worker 领取", True)
 
+        existing_run = await self.repository.get(command.run_id, command.tenant_id)
         run = RenderRun(
             runId=command.run_id,
             taskId=command.task_id,
@@ -81,6 +83,9 @@ class RenderService:
             stage=RunStage.CREATED,
             workerId=worker_id,
             leaseUntil=datetime.now(UTC) + timedelta(seconds=self.settings.lease_seconds),
+            sequence=existing_run.sequence if existing_run else 0,
+            metadata=existing_run.metadata if existing_run else {},
+            createdAt=existing_run.created_at if existing_run else datetime.now(UTC),
         )
         await self.repository.upsert(run)
         work_dir = (
@@ -222,6 +227,9 @@ class RenderService:
                         **run.metadata,
                         "qualityReport": report.model_dump(by_alias=True, mode="json"),
                         "manifestObjectKey": manifest_key,
+                        "coverObjectKey": cover_key,
+                        "previewObjectKey": preview_key,
+                        "qualityObjectKey": quality_key,
                     },
                     "updated_at": datetime.now(UTC),
                 }
@@ -239,7 +247,16 @@ class RenderService:
                 },
             )
             return run, report
-        except PlatformError as exc:
+        except Exception as raw_error:
+            exc = (
+                raw_error
+                if isinstance(raw_error, PlatformError)
+                else PlatformError(
+                    ErrorCode.INTERNAL_ERROR,
+                    f"渲染链路内部错误: {type(raw_error).__name__}",
+                    retryable=True,
+                )
+            )
             if exc.retryable:
                 await self.coordination.release_command(idempotency)
             stage = RunStage.CANCELLED if exc.code == ErrorCode.CANCELLED else (
@@ -267,7 +284,9 @@ class RenderService:
             )
             event = "video.render.cancelled" if stage == RunStage.CANCELLED else "video.render.failed"
             await self._publish(event, command, diagnostic)
-            raise
+            if exc is raw_error:
+                raise
+            raise exc from raw_error
         finally:
             heartbeat.cancel()
             await self.coordination.release_lease(command.run_id, worker_id)

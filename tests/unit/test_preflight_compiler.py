@@ -27,5 +27,6 @@ def test_compiler_uses_argument_array_and_filter_script(
     assert "-filter_complex_script" in compiled.args
     assert "shell=True" not in " ".join(compiled.args)
     assert "concat=n=2:v=1:a=0" in compiled.filter_graph
+    assert "anullsrc" not in compiled.filter_graph
+    assert "[0:a]atrim" in compiled.filter_graph
     assert compiled.output_path == output
-

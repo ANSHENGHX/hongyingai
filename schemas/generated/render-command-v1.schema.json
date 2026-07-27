@@ -77,6 +77,43 @@
           ],
           "default": null,
           "title": "Focusy"
+        },
+        "mediaType": {
+          "default": "video",
+          "enum": [
+            "video",
+            "image",
+            "audio"
+          ],
+          "title": "Mediatype",
+          "type": "string"
+        },
+        "hasAudio": {
+          "default": true,
+          "title": "Hasaudio",
+          "type": "boolean"
+        },
+        "labels": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Labels",
+          "type": "array"
+        },
+        "qualityScore": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Qualityscore"
         }
       },
       "required": [
@@ -616,6 +653,32 @@
           ],
           "default": null,
           "title": "Freezeatms"
+        },
+        "position": {
+          "default": "center",
+          "enum": [
+            "center",
+            "top_left",
+            "top_right",
+            "bottom_left",
+            "bottom_right"
+          ],
+          "title": "Position",
+          "type": "string"
+        },
+        "overlayScale": {
+          "default": 0.2,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Overlayscale",
+          "type": "number"
+        },
+        "margin": {
+          "default": 32,
+          "maximum": 500,
+          "minimum": 0,
+          "title": "Margin",
+          "type": "integer"
         }
       },
       "title": "Transform",

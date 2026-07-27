@@ -7,6 +7,13 @@ from hongying_ai.domain.models import OutputProfile, QualityItem, QualityReport
 from hongying_ai.domain.ports import MediaRunner
 
 
+def _rate(value: str | None) -> float:
+    if not value:
+        return 0
+    numerator, _, denominator = value.partition("/")
+    return float(numerator) / float(denominator or 1)
+
+
 class QualityService:
     def __init__(self, runner: MediaRunner) -> None:
         self.runner = runner
@@ -27,6 +34,13 @@ class QualityService:
         audio = next((stream for stream in streams if stream.get("codec_type") == "audio"), None)
         duration_ms = round(float(format_data.get("duration", 0)) * 1000)
         technical = [
+            _item(
+                "QUALITY_SCAN",
+                scan.get("returnCode") == 0,
+                "FFmpeg 质量扫描必须成功完成",
+                value=scan.get("returnCode"),
+                threshold=0,
+            ),
             _item("VIDEO_STREAM", video is not None, "必须包含视频流"),
             _item("AUDIO_STREAM", audio is not None, "必须包含音频流"),
             _item(
@@ -45,7 +59,35 @@ class QualityService:
                 value=video.get("pix_fmt") if video else "missing",
                 threshold="yuv420p",
             ),
+            _item(
+                "VIDEO_CODEC",
+                bool(video)
+                and video.get("codec_name")
+                == ("h264" if expected.video_codec == "h264" else "hevc"),
+                "视频编码必须符合输出配置",
+                value=video.get("codec_name") if video else "missing",
+                threshold=expected.video_codec,
+            ),
+            _item(
+                "FPS",
+                bool(video) and abs(_rate(video.get("avg_frame_rate")) - expected.fps) <= 0.2,
+                "帧率必须符合输出配置",
+                value=round(_rate(video.get("avg_frame_rate")), 3) if video else 0,
+                threshold=expected.fps,
+            ),
         ]
+        bit_rate = int(format_data.get("bit_rate") or 0) / 1000
+        if bit_rate:
+            expected_total = expected.video_bitrate_kbps + expected.audio_bitrate_kbps
+            technical.append(
+                _item(
+                    "BITRATE",
+                    0 < bit_rate <= expected_total * 1.8,
+                    "总码率不得超过输出配置的合理上限",
+                    value=round(bit_rate),
+                    threshold=f"≤{round(expected_total * 1.8)}kbps",
+                )
+            )
         if expected_duration_ms is not None:
             technical.append(
                 _item(
@@ -112,4 +154,3 @@ def _item(
         threshold=threshold,
         autoFixable=auto_fixable,
     )
-

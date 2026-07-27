@@ -40,19 +40,59 @@ class MySqlRunRepository:
               :run_id, :task_id, :tenant_id, :run_no, :stage, :progress, :sequence_no,
               :worker_id, :lease_until, :attempt, :output_object_key, :error_code,
               :error_summary, :metadata_json, :created_at, :updated_at
-            )
+            ) AS incoming
             ON DUPLICATE KEY UPDATE
-              stage = VALUES(stage),
-              progress = IF(VALUES(sequence_no) >= sequence_no, VALUES(progress), progress),
-              sequence_no = GREATEST(sequence_no, VALUES(sequence_no)),
-              worker_id = VALUES(worker_id),
-              lease_until = VALUES(lease_until),
-              attempt = VALUES(attempt),
-              output_object_key = VALUES(output_object_key),
-              error_code = VALUES(error_code),
-              error_summary = VALUES(error_summary),
-              metadata_json = VALUES(metadata_json),
-              updated_at = VALUES(updated_at)
+              stage = IF(
+                incoming.sequence_no >= ai_render_run.sequence_no,
+                incoming.stage,
+                ai_render_run.stage
+              ),
+              progress = IF(
+                incoming.sequence_no >= ai_render_run.sequence_no,
+                incoming.progress,
+                ai_render_run.progress
+              ),
+              sequence_no = GREATEST(ai_render_run.sequence_no, incoming.sequence_no),
+              worker_id = IF(
+                incoming.sequence_no >= ai_render_run.sequence_no,
+                incoming.worker_id,
+                ai_render_run.worker_id
+              ),
+              lease_until = IF(
+                incoming.sequence_no >= ai_render_run.sequence_no,
+                incoming.lease_until,
+                ai_render_run.lease_until
+              ),
+              attempt = IF(
+                incoming.sequence_no >= ai_render_run.sequence_no,
+                incoming.attempt,
+                ai_render_run.attempt
+              ),
+              output_object_key = IF(
+                incoming.sequence_no >= ai_render_run.sequence_no,
+                incoming.output_object_key,
+                ai_render_run.output_object_key
+              ),
+              error_code = IF(
+                incoming.sequence_no >= ai_render_run.sequence_no,
+                incoming.error_code,
+                ai_render_run.error_code
+              ),
+              error_summary = IF(
+                incoming.sequence_no >= ai_render_run.sequence_no,
+                incoming.error_summary,
+                ai_render_run.error_summary
+              ),
+              metadata_json = IF(
+                incoming.sequence_no >= ai_render_run.sequence_no,
+                incoming.metadata_json,
+                ai_render_run.metadata_json
+              ),
+              updated_at = IF(
+                incoming.sequence_no >= ai_render_run.sequence_no,
+                incoming.updated_at,
+                ai_render_run.updated_at
+              )
             """
         )
         value = run.model_dump()

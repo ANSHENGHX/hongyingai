@@ -66,6 +66,14 @@ def validate_timeline(timeline: Timeline, manifest: InputManifest | None = None)
                         ValidationIssue(path, "CLIP_OUT_OF_RANGE", "片段结束时间超过素材时长")
                     )
         if track.type == TrackType.VIDEO:
+            if clips and clips[0].timeline_start_ms != 0:
+                issues.append(
+                    ValidationIssue(
+                        f"/tracks/{track_index}/clips/0/timelineStartMs",
+                        "PRIMARY_TRACK_MUST_START_AT_ZERO",
+                        "视频主轨必须从 0 开始",
+                    )
+                )
             for previous, current in zip(clips, clips[1:], strict=False):
                 previous_end = previous.timeline_start_ms + previous.duration_ms
                 if current.timeline_start_ms < previous_end:
@@ -84,6 +92,14 @@ def validate_timeline(timeline: Timeline, manifest: InputManifest | None = None)
                                 "视频主轨仅允许与相邻转场时长一致的重叠",
                             )
                         )
+                elif current.timeline_start_ms > previous_end:
+                    issues.append(
+                        ValidationIssue(
+                            f"/tracks/{track_index}/clips",
+                            "PRIMARY_TRACK_GAP",
+                            "视频主轨不允许存在未定义的空白间隔",
+                        )
+                    )
 
     for index, transition in enumerate(timeline.transitions):
         path = f"/transitions/{index}"
@@ -92,6 +108,17 @@ def validate_timeline(timeline: Timeline, manifest: InputManifest | None = None)
         if not left or not right:
             issues.append(ValidationIssue(path, "TRANSITION_CLIP_NOT_FOUND", "转场引用的片段不存在"))
             continue
+        adjacent = any(
+            left.id == clips[index].id and right.id == clips[index + 1].id
+            for track in timeline.tracks
+            if track.type == TrackType.VIDEO
+            for clips in [sorted(track.clips, key=lambda item: item.timeline_start_ms)]
+            for index in range(len(clips) - 1)
+        )
+        if not adjacent:
+            issues.append(
+                ValidationIssue(path, "TRANSITION_NOT_ADJACENT", "转场只能引用视频主轨相邻片段")
+            )
         if transition.type not in SUPPORTED_TRANSITIONS:
             issues.append(ValidationIssue(path, "TRANSITION_UNSUPPORTED", "不支持的转场类型"))
         max_duration = min(left.duration_ms, right.duration_ms) // 2

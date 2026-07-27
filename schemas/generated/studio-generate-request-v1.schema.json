@@ -129,29 +129,109 @@
   },
   "additionalProperties": false,
   "properties": {
-    "schemaVersion": {
-      "const": "1.0",
-      "default": "1.0",
-      "title": "Schemaversion",
+    "merchantId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Merchantid",
       "type": "string"
     },
-    "tenantId": {
-      "exclusiveMinimum": 0,
-      "title": "Tenantid",
-      "type": "integer"
+    "merchantName": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Merchantname",
+      "type": "string"
+    },
+    "activityId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Activityid",
+      "type": "string"
+    },
+    "activityTitle": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Activitytitle",
+      "type": "string"
+    },
+    "activityType": {
+      "default": "营销活动",
+      "maxLength": 100,
+      "title": "Activitytype",
+      "type": "string"
+    },
+    "userGoal": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Usergoal",
+      "type": "string"
+    },
+    "templateId": {
+      "title": "Templateid",
+      "type": "string"
     },
     "assets": {
       "items": {
         "$ref": "#/$defs/AssetManifestEntry"
       },
+      "minItems": 1,
       "title": "Assets",
       "type": "array"
+    },
+    "logoAssetId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Logoassetid"
+    },
+    "bgmAssetId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bgmassetid"
+    },
+    "sellingPoints": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Sellingpoints",
+      "type": "array"
+    },
+    "forbiddenWords": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Forbiddenwords",
+      "type": "array"
+    },
+    "useAi": {
+      "default": true,
+      "title": "Useai",
+      "type": "boolean"
     }
   },
   "required": [
-    "tenantId",
+    "merchantId",
+    "merchantName",
+    "activityId",
+    "activityTitle",
+    "userGoal",
+    "templateId",
     "assets"
   ],
-  "title": "InputManifest",
+  "title": "StudioGenerateRequest",
   "type": "object"
 }

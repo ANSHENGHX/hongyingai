@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from pydantic import TypeAdapter
@@ -195,7 +196,14 @@ class PlannerService:
                 ),
             ),
         )
-        shot_count = min(max(1, len(assets.assets)), 6)
+        available_duration = sum(asset.duration_ms for asset in assets.assets)
+        repeat_factor = math.ceil(
+            snapshot.constraints.duration_ms / max(1, available_duration)
+        )
+        shot_count = min(
+            12,
+            max(1, len(assets.assets), len(assets.assets) * repeat_factor),
+        )
         durations = _allocate_duration(snapshot.constraints.duration_ms, shot_count)
         shots = tuple(
             StoryboardShot(
@@ -216,8 +224,18 @@ class PlannerService:
             return storyboard
         shots = []
         remaining = target_duration_ms
-        for index, shot in enumerate(storyboard.shots):
-            asset = assets.assets[index % len(assets.assets)]
+        used: set[str] = set()
+        for shot in storyboard.shots:
+            ranked = sorted(
+                assets.assets,
+                key=lambda item: (
+                    _asset_match_score(shot.asset_query, item, item.asset_id in used),
+                    item.asset_id,
+                ),
+                reverse=True,
+            )
+            asset = ranked[0]
+            used.add(asset.asset_id)
             duration = min(shot.duration_ms, asset.duration_ms, remaining)
             if duration <= 0:
                 break
@@ -226,8 +244,12 @@ class PlannerService:
                     update={
                         "selected_asset_id": asset.asset_id,
                         "duration_ms": duration,
-                        "match_score": 1.0 if index < len(assets.assets) else 0.8,
-                        "explain": "按镜头顺序、可用时长和授权清单确定性匹配",
+                        "match_score": _asset_match_score(
+                            shot.asset_query, asset, False
+                        ),
+                        "explain": (
+                            "按标签、画面质量、授权、可用时长和素材去重规则匹配"
+                        ),
                     }
                 )
             )
@@ -272,6 +294,18 @@ class PlannerService:
 def _allocate_duration(total: int, count: int) -> list[int]:
     base, remainder = divmod(total, count)
     return [base + (1 if index < remainder else 0) for index in range(count)]
+
+
+def _asset_match_score(query: str, asset: Any, already_used: bool) -> float:
+    normalized = query.casefold()
+    label_hits = sum(1 for label in asset.labels if label.casefold() in normalized)
+    quality = (asset.quality_score if asset.quality_score is not None else 70) / 100
+    score = 0.35 + min(0.35, label_hits * 0.18) + quality * 0.2
+    if asset.license_id:
+        score += 0.1
+    if already_used:
+        score -= 0.2
+    return round(max(0, min(1, score)), 4)
 
 
 def planner_output_schema() -> dict[str, Any]:
