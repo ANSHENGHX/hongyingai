@@ -12,7 +12,7 @@
       <a class="brand" href="/studio" aria-label="宏映AI首页">
         <span class="brand-mark">HY</span>
         <span>宏映AI</span>
-        <small>一键成片</small>
+        <small>短视频工作台</small>
       </a>
       <div class="runtime">
         <span class="status-dot"></span>
@@ -22,17 +22,16 @@
     </header>
 
     <main>
-      <section class="hero">
+      <section class="command-strip" aria-label="工作流状态">
         <div>
           <p class="eyebrow">HONGYING AI VIDEO STUDIO</p>
-          <h1>从素材到作品，<br><em>一次点击。</em></h1>
-          <p class="hero-copy">选择商户、活动、模板和素材。系统会完成创意规划、智能匹配、视频合成与质量检测。</p>
+          <h1>输入制作目标，AI 自动填完整方案</h1>
         </div>
         <ol class="flow" aria-label="生成流程">
-          <li><span>01</span>创意规划</li>
-          <li><span>02</span>素材匹配</li>
-          <li><span>03</span>视频合成</li>
-          <li><span>04</span>质量检测</li>
+          <li><span>01</span>输入目标</li>
+          <li><span>02</span>AI填表</li>
+          <li><span>03</span>合成质检</li>
+          <li><span>04</span>一键发布</li>
         </ol>
       </section>
 
@@ -41,15 +40,38 @@
           <article class="panel">
             <div class="panel-heading">
               <span class="step">01</span>
-              <div><h2>商户与活动</h2><p>告诉 AI 这条视频为谁、为什么而做。</p></div>
+              <div><h2>制作目标</h2><p>只需要描述这条视频要达成什么目标，AI 会先生成爆款文案，再按文案生成视频。</p></div>
+            </div>
+            <div class="goal-box">
+              <label class="wide">想制作的目标<textarea id="creationGoal" class="goal-text" placeholder="例如：给蜀香里火锅做一条抖音短视频，主推双人套餐，突出手工锅底和现切鲜肉，吸引附近顾客到店。"></textarea></label>
+              <button id="autofillButton" class="primary-button" type="button">
+                <span>AI 一键生成方案</span><b>→</b>
+              </button>
+              <span id="autofillState">商户信息使用注册资料；AI 只补活动、文案、关键词、分镜和视频设置。</span>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span class="step">02</span>
+              <div><h2>选择生成方向</h2><p>不同方向会使用不同的视频结构、画面风格、配音字幕和音乐策略。</p></div>
+            </div>
+            <div id="directionList" class="direction-list" role="radiogroup" aria-label="生成方向"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span class="step">03</span>
+              <div><h2>AI 已填写的方案</h2><p>下面所有内容都可以手动修改，最终以你提交时的字段为准。</p></div>
             </div>
             <div class="field-grid">
-              <label>商户名称<input id="merchantName" required placeholder="例如：蜀香里火锅"></label>
-              <label>商户编号<input id="merchantId" required placeholder="例如：M10086"></label>
-              <label>活动名称<input id="activityTitle" required placeholder="例如：夏日双人餐限时活动"></label>
-              <label>活动编号<input id="activityId" required placeholder="例如：ACT202607"></label>
+              <label>商户名称<input id="merchantName" placeholder="注册商户名称，可由系统带入"></label>
+              <label>商户编号<input id="merchantId" placeholder="注册商户编号，可由系统带入"></label>
+              <label>活动名称<input id="activityTitle" placeholder="AI 自动填写"></label>
+              <label>活动编号<input id="activityId" placeholder="AI 自动填写"></label>
               <label>活动类型
                 <select id="activityType">
+                  <option>营销活动</option>
                   <option>餐饮促销</option>
                   <option>新品上市</option>
                   <option>门店探店</option>
@@ -57,15 +79,32 @@
                   <option>品牌宣传</option>
                 </select>
               </label>
-              <label class="wide">制作目标<textarea id="userGoal" required placeholder="突出锅底和招牌菜，吸引附近顾客到店购买双人套餐。"></textarea></label>
-              <label class="wide">核心卖点<input id="sellingPoints" placeholder="用逗号分隔，例如：现切鲜肉, 手工锅底, 双人套餐"></label>
+              <label>视频主题<input id="videoTopic" placeholder="AI 会紧扣制作目标生成"></label>
+              <label class="wide">发布平台
+                <span class="platform-toggle" role="group" aria-label="发布平台">
+                  <label><input type="checkbox" class="platform-check" value="douyin" checked><span>抖音</span></label>
+                  <label><input type="checkbox" class="platform-check" value="kuaishou" checked><span>快手</span></label>
+                  <label><input type="checkbox" class="platform-check" value="wechat_channels" checked><span>视频号</span></label>
+                </span>
+              </label>
+              <label class="wide">制作目标<textarea id="userGoal" placeholder="AI 会保留用户目标，可修改。"></textarea></label>
+              <label class="wide">核心卖点/关键词<input id="sellingPoints" placeholder="用逗号分隔，例如：现切鲜肉, 手工锅底, 双人套餐"></label>
+              <div class="script-toolbar wide">
+                <button id="scriptButton" class="secondary-button" type="button">AI 生成文案</button>
+                <span id="scriptState">文案可生成后继续编辑</span>
+              </div>
+              <label>视频标题<input id="scriptTitle" placeholder="AI 会生成适合发布平台的标题"></label>
+              <label>推荐话题<input id="scriptTags" placeholder="#火锅 #美食 #同城探店"></label>
+              <label class="wide">素材关键词<input id="materialTerms" placeholder="AI 会生成素材匹配关键词，例如：锅底, 菜品, 门店环境"></label>
+              <label class="wide">视频文案<textarea id="scriptText" class="script-text" placeholder="点击“AI 生成文案”，或手动输入要出现在字幕和口播里的内容。"></textarea></label>
+              <div id="storyboardPreview" class="storyboard-preview wide" hidden></div>
             </div>
           </article>
 
           <article class="panel">
             <div class="panel-heading">
-              <span class="step">02</span>
-              <div><h2>选择视频模板</h2><p>模板决定节奏、画幅、转场与字幕风格。</p></div>
+              <span class="step">04</span>
+              <div><h2>选择视频模板</h2><p>竖屏模板适配抖音、快手、视频号，模板决定节奏、转场与字幕风格。</p></div>
             </div>
             <div id="templateList" class="template-list" aria-live="polite">
               <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
@@ -74,14 +113,15 @@
 
           <article class="panel">
             <div class="panel-heading">
-              <span class="step">03</span>
-              <div><h2>选择素材</h2><p>上传图片、视频、Logo 或 BGM，解析完成后即可勾选。</p></div>
+              <span class="step">05</span>
+              <div><h2>选择素材</h2><p>上传图片、视频、Logo 或 BGM；视频最多 9 段，图片最多 100 张。没有主画面素材时，LangGraph 会按生成方向自动生产分镜素材。</p></div>
               <label class="upload-button">
                 <input id="assetUpload" type="file" multiple accept="image/*,video/*,audio/*">
                 ＋ 上传素材
               </label>
             </div>
             <div id="uploadState" class="upload-state" hidden></div>
+            <div class="asset-tip">默认不勾选素材；不选择主画面素材时，将按上方生成方向执行 AI 生图、图生视频、配音和合成。需要使用自己上传的图片/视频时，再手动勾选。</div>
             <div id="assetList" class="asset-list" aria-live="polite">
               <div class="empty">正在读取素材库…</div>
             </div>
@@ -91,23 +131,108 @@
             </div>
           </article>
 
+          <article class="panel">
+            <div class="panel-heading">
+              <span class="step">06</span>
+              <div><h2>生成设置</h2><p>参考 MoneyPrinterTurbo 的常用控制项，但输出仍走宏映AI Timeline 和质检。</p></div>
+            </div>
+            <div class="settings-grid">
+              <label>视频画幅
+                <select id="videoAspect">
+                  <option value="9:16">竖屏 9:16（抖音/快手/视频号）</option>
+                  <option value="16:9">横屏 16:9</option>
+                  <option value="1:1">方屏 1:1</option>
+                </select>
+              </label>
+              <label>成片时长
+                <select id="durationSeconds">
+                  <option value="">跟随模板（最低 15 秒）</option>
+                  <option value="15">15 秒</option>
+                  <option value="20">20 秒</option>
+                  <option value="30">30 秒</option>
+                  <option value="45">45 秒</option>
+                  <option value="60">60 秒</option>
+                </select>
+              </label>
+              <label>单镜头上限
+                <select id="clipDuration">
+                  <option value="3">3 秒 快节奏</option>
+                  <option value="4" selected>4 秒 标准</option>
+                  <option value="6">6 秒 展示细节</option>
+                  <option value="8">8 秒 慢节奏</option>
+                </select>
+              </label>
+              <label>转场
+                <select id="transitionMode">
+                  <option value="template">跟随模板</option>
+                  <option value="cut">直接切</option>
+                  <option value="fade">淡入淡出</option>
+                  <option value="crossfade">交叉淡化</option>
+                  <option value="slide">滑动</option>
+                  <option value="zoom">缩放</option>
+                </select>
+              </label>
+              <label>生成条数
+                <select id="renderCount">
+                  <option value="1">1 条</option>
+                  <option value="2">2 条候选</option>
+                  <option value="3">3 条候选</option>
+                </select>
+              </label>
+              <label>热门配音
+                <select id="ttsVoice">
+                  <option value="baidu_hot_female">热门女声｜种草口播</option>
+                  <option value="baidu_hot_male">磁性男声｜知识讲解</option>
+                  <option value="baidu_energy_female">元气女声｜活动快闪</option>
+                  <option value="baidu_story_male">故事男声｜短剧叙事</option>
+                  <option value="baidu_child">童趣声音｜绘本治愈</option>
+                </select>
+              </label>
+              <label class="switch-line">
+                <input id="matchMaterials" type="checkbox" checked>
+                <span>按文案和关键词优先匹配素材</span>
+              </label>
+            </div>
+          </article>
+
           <article class="launch-panel">
             <div>
               <p class="eyebrow">READY TO CREATE</p>
-              <h2>让素材变成可发布的作品</h2>
-              <p>提交后可离开本页，任务状态会保存在运行记录中。</p>
+              <h2>按确认文案一键生成视频</h2>
+              <p>系统会完成 Brief、Storyboard、Timeline、素材匹配、FFmpeg 合成与质量检测。</p>
             </div>
             <button id="generateButton" class="primary-button" type="submit">
-              <span>一键生成视频</span><b>→</b>
+              <span>根据文案生成视频</span><b>→</b>
             </button>
           </article>
         </form>
 
         <aside id="resultPanel" class="result-panel" aria-live="polite">
-          <div class="result-empty">
+          <div id="aiProgress" class="ai-progress" hidden>
+            <div class="progress-top">
+              <p class="eyebrow">AI LIVE PROGRESS</p>
+              <span id="aiProgressPercent" class="stage-badge">0%</span>
+            </div>
+            <h2 id="aiProgressTitle">AI 准备中</h2>
+            <div class="progress-track"><div id="aiProgressBar" class="progress-bar"></div></div>
+            <ol id="aiProgressSteps" class="ai-step-list"></ol>
+          </div>
+          <section class="task-center" aria-label="任务中心">
+            <div class="progress-top">
+              <div>
+                <p class="eyebrow">TASK CENTER</p>
+                <h2>任务中心</h2>
+              </div>
+              <button id="refreshTasks" class="ghost-button" type="button">刷新</button>
+            </div>
+            <div id="taskList" class="task-list">
+              <div class="empty compact">暂无生成任务</div>
+            </div>
+          </section>
+          <div id="resultContent" class="result-empty">
             <div class="film-icon">▶</div>
             <h2>作品将在这里生成</h2>
-            <p>完成左侧四步后，一键启动完整视频工作流。</p>
+            <p>只输入制作目标即可一键启动；无素材时由本地 LangGraph 工作流生成分镜素材，并自动完成配音、字幕、合成和质检。</p>
           </div>
         </aside>
       </section>

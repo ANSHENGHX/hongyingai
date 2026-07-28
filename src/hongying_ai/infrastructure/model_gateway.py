@@ -11,11 +11,24 @@ from hongying_ai.config import Settings
 from hongying_ai.domain.errors import ErrorCode, PlatformError
 
 
-class DeepSeekModelClient:
+class OpenAICompatibleModelClient:
     def __init__(self, settings: Settings) -> None:
-        self.base_url = settings.deepseek_base_url.rstrip("/")
-        self.api_key = settings.deepseek_api_key
-        self.model = settings.deepseek_model
+        provider = settings.model_provider.strip().lower()
+        if provider == "kimi":
+            self.provider = "kimi"
+            self.base_url = settings.kimi_base_url.rstrip("/")
+            self.api_key = settings.kimi_api_key
+            self.model = settings.kimi_model
+        elif provider == "ark":
+            self.provider = "ark"
+            self.base_url = settings.ark_base_url.rstrip("/")
+            self.api_key = settings.ark_api_key
+            self.model = settings.ark_text_model
+        else:
+            self.provider = "deepseek"
+            self.base_url = settings.deepseek_base_url.rstrip("/")
+            self.api_key = settings.deepseek_api_key
+            self.model = settings.deepseek_model
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(60, connect=10))
 
     async def structured_output(
@@ -48,7 +61,11 @@ class DeepSeekModelClient:
                     "messages": [
                         {
                             "role": "system",
-                            "content": f"{system_prompt}\n必须符合以下 JSON Schema：{schema_text}",
+                            "content": (
+                                f"{system_prompt}\n"
+                                "必须只返回一个合法的 json 对象，并符合以下 JSON Schema："
+                                f"{schema_text}"
+                            ),
                         },
                         {"role": "user", "content": f"<untrusted_data>{data_text}</untrusted_data>"},
                     ],
@@ -60,7 +77,7 @@ class DeepSeekModelClient:
             value = json.loads(content)
             usage = body.get("usage", {})
             return value, {
-                "provider": "deepseek",
+                "provider": self.provider,
                 "model": self.model,
                 "promptId": prompt_id,
                 "promptVersion": prompt_version,
@@ -82,3 +99,5 @@ class DeepSeekModelClient:
     async def close(self) -> None:
         await self.client.aclose()
 
+
+DeepSeekModelClient = OpenAICompatibleModelClient

@@ -43,6 +43,30 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_api_key: str = ""
     deepseek_model: str = "deepseek-v4-flash"
+    model_provider: str = "deepseek"
+    kimi_base_url: str = "https://api.moonshot.ai/v1"
+    kimi_api_key: str = ""
+    kimi_model: str = "moonshot-v1-8k"
+
+    baidu_tts_api_key: str = ""
+    baidu_tts_short_url: str = "https://tsn.baidu.com/text2audio"
+    baidu_tts_voice: int = 5003
+    baidu_tts_speed: int = 5
+    baidu_tts_pitch: int = 5
+    baidu_tts_volume: int = 8
+
+    ark_media_enabled: bool = False
+    ark_base_url: str = "https://ark.cn-beijing.volces.com/api/v3"
+    ark_api_key: str = ""
+    ark_text_model: str = "doubao-seed-1-6-flash-250828"
+    ark_image_model: str = ""
+    ark_video_model: str = ""
+    ark_timeout_seconds: int = 900
+    ark_poll_interval_seconds: float = 3.0
+    ai_video_clip_duration_seconds: int = 5
+    ai_video_min_clip_count: int = 3
+    ai_video_max_clip_count: int = 6
+    ai_video_require_motion: bool = False
 
     ffmpeg_path: str = "ffmpeg"
     ffprobe_path: str = "ffprobe"

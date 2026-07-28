@@ -57,6 +57,21 @@ def _overlay_position(position: str, margin: int) -> tuple[str, str]:
     return values[position]
 
 
+def _image_motion_filters(duration_ms: int, width: int, height: int, fps: int) -> list[str]:
+    frames = max(1, round(duration_ms * fps / 1000))
+    return [
+        (
+            "zoompan="
+            "z='min(zoom+0.0012,1.08)':"
+            "x='iw/2-(iw/zoom/2)':"
+            "y='ih/2-(ih/zoom/2)':"
+            f"d={frames}:s={width}x{height}:fps={fps}"
+        ),
+        f"trim=duration={duration_ms / 1000:.3f}",
+        "setpts=PTS-STARTPTS",
+    ]
+
+
 def write_ass(timeline: Timeline, path: Path) -> None:
     width = timeline.canvas.width
     height = timeline.canvas.height
@@ -192,7 +207,7 @@ def compile_timeline(
         asset = manifest_assets[clip.asset_id]
         if asset.media_type == "image":
             chain = [
-                f"trim=duration={clip.duration_ms / 1000:.3f}",
+                "trim=duration=0.040",
                 "setpts=PTS-STARTPTS",
             ]
         else:
@@ -231,8 +246,14 @@ def compile_timeline(
                 f"[{background}][vfgs{clip_no}]overlay=(W-w)/2:(H-h)/2[{composed}]"
             )
             label = f"v{clip_no}"
+            motion = (
+                ",".join(_image_motion_filters(clip.duration_ms, width, height, timeline.canvas.fps))
+                + ","
+                if asset.media_type == "image"
+                else ""
+            )
             filters.append(
-                f"[{composed}]eq=brightness={transform.brightness:.3f}:"
+                f"[{composed}]{motion}eq=brightness={transform.brightness:.3f}:"
                 f"contrast={transform.contrast:.3f}:saturation={transform.saturation:.3f},"
                 f"fps={timeline.canvas.fps},format=yuv420p[{label}]"
             )
@@ -250,6 +271,8 @@ def compile_timeline(
                 f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
                 f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color={timeline.canvas.background}"
             )
+        if asset.media_type == "image":
+            chain.extend(_image_motion_filters(clip.duration_ms, width, height, timeline.canvas.fps))
         chain.append(
             f"eq=brightness={transform.brightness:.3f}:"
             f"contrast={transform.contrast:.3f}:saturation={transform.saturation:.3f}"
@@ -346,7 +369,10 @@ def compile_timeline(
             f"enable='between(t,{start:.3f},{end:.3f})'[{composed_label}]"
         )
         current = composed_label
-    filters.append(f"[{current}]format=yuv420p[vout]")
+    filters.append(
+        f"[{current}]tpad=stop_mode=clone:stop_duration=5,"
+        "scale=in_range=pc:out_range=tv,format=yuv420p,setparams=range=tv[vout]"
+    )
 
     audio_labels: list[str] = []
     audio_number = 0

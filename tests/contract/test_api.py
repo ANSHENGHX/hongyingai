@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 from hongying_ai.api import create_app
 from hongying_ai.config import Settings
 from hongying_ai.container import Container
+from hongying_ai.domain.models import RenderRun, RunStage
 from hongying_ai.infrastructure.memory import MemoryCoordinationStore
 from hongying_ai.infrastructure.repository import MemoryRunRepository
 
@@ -39,11 +41,18 @@ def app_client(tmp_path: Path) -> TestClient:
         runner=healthy,
         bus=healthy,
         model=healthy,  # type: ignore[arg-type]
+        tts=healthy,  # type: ignore[arg-type]
+        image_generator=None,
+        video_generator=None,
         media=None,  # type: ignore[arg-type]
         planner=None,  # type: ignore[arg-type]
         quality=None,  # type: ignore[arg-type]
     )
     return TestClient(create_app(settings, container))
+
+
+async def seed_run(client: TestClient, run: RenderRun) -> None:
+    await client.app.state.container.repository.upsert(run)
 
 
 def headers() -> dict[str, str]:
@@ -110,3 +119,32 @@ def test_generated_request_id_is_consistent_between_header_and_body(
     with app_client(tmp_path) as client:
         response = client.post("/internal/v1/timelines/validate", headers=denied, json=payload)
     assert response.headers["X-Request-Id"] == response.json()["requestId"]
+
+
+def test_run_stream_returns_ndjson_progress(tmp_path: Path) -> None:
+    with app_client(tmp_path) as client:
+        client.portal.call(
+            seed_run,
+            client,
+            RenderRun(
+                runId="run_stream",
+                taskId=90002,
+                tenantId=10001,
+                runNo=1,
+                stage=RunStage.COMPLETED,
+                progress=1,
+                sequence=3,
+            ),
+        )
+        with client.stream(
+            "GET",
+            "/internal/v1/runs/run_stream/stream",
+            headers=headers(),
+        ) as response:
+            lines = list(response.iter_lines())
+
+    assert response.status_code == 200
+    assert lines
+    payload = json.loads(lines[0])
+    assert payload["runId"] == "run_stream"
+    assert payload["stage"] == "COMPLETED"

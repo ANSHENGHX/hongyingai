@@ -29,6 +29,25 @@ class MySqlRunRepository:
             row = (await connection.execute(text(query), params)).mappings().first()
         return _to_run(row) if row else None
 
+    async def list_recent(self, tenant_id: int, limit: int = 20) -> list[RenderRun]:
+        statement = text(
+            """
+            SELECT *
+            FROM ai_render_run
+            WHERE tenant_id = :tenant_id
+            ORDER BY updated_at DESC, created_at DESC
+            LIMIT :limit
+            """
+        )
+        async with self.engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    statement,
+                    {"tenant_id": tenant_id, "limit": max(1, min(limit, 100))},
+                )
+            ).mappings()
+            return [_to_run(row) for row in rows]
+
     async def upsert(self, run: RenderRun) -> None:
         query = text(
             """
@@ -273,6 +292,11 @@ class MemoryRunRepository:
         if value and tenant_id is not None and value.tenant_id != tenant_id:
             return None
         return value
+
+    async def list_recent(self, tenant_id: int, limit: int = 20) -> list[RenderRun]:
+        values = [run for run in self.values.values() if run.tenant_id == tenant_id]
+        values.sort(key=lambda run: run.updated_at, reverse=True)
+        return values[: max(1, min(limit, 100))]
 
     async def upsert(self, run: RenderRun) -> None:
         current = self.values.get(run.run_id)

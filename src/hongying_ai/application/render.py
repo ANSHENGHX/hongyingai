@@ -25,6 +25,8 @@ from hongying_ai.domain.ports import (
 )
 from hongying_ai.domain.timeline import assert_safe_object_key, validate_timeline
 
+MIN_OUTPUT_DURATION_MS = 15_000
+
 
 class RenderService:
     def __init__(
@@ -49,6 +51,11 @@ class RenderService:
     async def execute(self, command: RenderCommand) -> tuple[RenderRun, QualityReport]:
         started_at = time.perf_counter()
         idempotency = f"{command.command_type}:{command.task_id}:{command.run_no}"
+        if command.timeline.duration_ms < MIN_OUTPUT_DURATION_MS:
+            raise PlatformError(
+                ErrorCode.INVALID_COMMAND,
+                "成片时长必须不少于 15 秒",
+            )
         issues = validate_timeline(command.timeline, command.input_manifest)
         if issues:
             raise TimelineInvalid("Timeline 校验失败", [item.to_dict() for item in issues])
@@ -327,7 +334,7 @@ class RenderService:
         updated = run.model_copy(
             update={
                 "stage": stage,
-                "progress": max(run.progress, progress),
+                "progress": round(max(run.progress, progress), 2),
                 "sequence": run.sequence + 1,
                 "lease_until": datetime.now(UTC) + timedelta(seconds=self.settings.lease_seconds),
                 "updated_at": datetime.now(UTC),
@@ -340,7 +347,7 @@ class RenderService:
             {
                 "sequence": updated.sequence,
                 "stage": stage.value,
-                "stageProgress": progress,
+                "stageProgress": round(progress, 2),
                 "overallProgress": updated.progress,
             },
         )

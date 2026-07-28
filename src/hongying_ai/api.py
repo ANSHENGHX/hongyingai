@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import mimetypes
 import shutil
 from collections.abc import AsyncIterator
@@ -12,9 +13,15 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 import uvicorn
-from fastapi import Depends, FastAPI, File, Header, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Header, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
@@ -37,11 +44,17 @@ from hongying_ai.contracts.api import (
 )
 from hongying_ai.contracts.studio import (
     StudioAssetResult,
+    StudioAutofillRequest,
+    StudioAutofillResult,
     StudioGenerateRequest,
     StudioGenerateResult,
+    StudioPublishRequest,
+    StudioPublishResult,
+    StudioScriptRequest,
+    StudioScriptResult,
 )
 from hongying_ai.domain.errors import ErrorCode, PlatformError
-from hongying_ai.domain.models import AnalysisProfile, RenderRun
+from hongying_ai.domain.models import TERMINAL_STAGES, AnalysisProfile, RenderRun
 from hongying_ai.domain.timeline import assert_safe_object_key, validate_timeline
 
 REQUESTS = Counter("hongying_api_requests_total", "API 请求数", ["path", "method", "status"])
@@ -102,6 +115,9 @@ def create_app(
         resolved_container.repository,
         resolved_container.store,
         resolved_container.bus,
+        resolved_container.tts,
+        resolved_container.video_generator,
+        resolved_container.image_generator,
     )
 
     @asynccontextmanager
@@ -126,6 +142,23 @@ def create_app(
     app.state.studio = studio_service
     web_dir = Path(__file__).with_name("web")
     app.mount("/studio/static", StaticFiles(directory=web_dir), name="studio-static")
+
+    async def studio_asset_counts(tenant_id: int) -> dict[str, int]:
+        prefix = f"{resolved_settings.environment_object_prefix}/{tenant_id}/studio/assets/"
+        objects = await resolved_container.store.list(prefix)
+        counts = {"video": 0, "image": 0, "audio": 0}
+        for item in objects:
+            object_key = str(item["objectKey"])
+            if not object_key.endswith(".json"):
+                continue
+            try:
+                catalog = await resolved_container.store.get_json(object_key)
+            except Exception:
+                catalog = {}
+            media_type = catalog.get("asset", {}).get("mediaType")
+            if media_type in counts:
+                counts[media_type] += 1
+        return counts
 
     @app.middleware("http")
     async def observe(request: Request, call_next: Any) -> Any:
@@ -229,6 +262,30 @@ def create_app(
             data={"templates": [template.to_dict() for template in TEMPLATES]},
         )
 
+    @app.post("/internal/v1/studio/scripts")
+    async def studio_script(
+        body: StudioScriptRequest,
+        context: Context,
+    ) -> ApiResponse[StudioScriptResult]:
+        draft = await studio_service.draft_script(
+            body,
+            tenant_id=context.tenant_id,
+            trace_id=context.trace_id,
+        )
+        return ApiResponse(requestId=context.request_id, data=draft)
+
+    @app.post("/internal/v1/studio/autofill")
+    async def studio_autofill(
+        body: StudioAutofillRequest,
+        context: Context,
+    ) -> ApiResponse[StudioAutofillResult]:
+        result = await studio_service.autofill(
+            body,
+            tenant_id=context.tenant_id,
+            trace_id=context.trace_id,
+        )
+        return ApiResponse(requestId=context.request_id, data=result)
+
     @app.post("/internal/v1/studio/assets/upload")
     async def studio_upload_asset(
         context: Context,
@@ -251,6 +308,18 @@ def create_app(
         }
         if suffix not in allowed:
             raise PlatformError(ErrorCode.MEDIA_UNSUPPORTED, f"不支持的素材格式: {suffix}")
+        media_kind = (
+            "video"
+            if suffix in {".mp4", ".mov", ".mkv", ".webm"}
+            else "image"
+            if suffix in {".jpg", ".jpeg", ".png", ".webp"}
+            else "audio"
+        )
+        counts = await studio_asset_counts(context.tenant_id)
+        if media_kind == "video" and counts["video"] >= 9:
+            raise PlatformError(ErrorCode.RESOURCE_EXHAUSTED, "视频素材最多上传 9 段")
+        if media_kind == "image" and counts["image"] >= 100:
+            raise PlatformError(ErrorCode.RESOURCE_EXHAUSTED, "图片素材最多上传 100 张")
         asset_id = f"asset_{uuid4().hex}"
         work_dir = Path(
             mkdtemp(prefix=f"upload-{context.tenant_id}-", dir=resolved_settings.app_work_dir)
@@ -352,15 +421,37 @@ def create_app(
         )
         return RedirectResponse(await resolved_container.store.presigned_get(object_key))
 
+    @app.get("/studio/objects", include_in_schema=False)
+    async def studio_page_object(
+        object_key: str,
+        tenant_id: Annotated[int, Query(gt=0)],
+    ) -> RedirectResponse:
+        assert_safe_object_key(
+            object_key,
+            tenant_id,
+            resolved_settings.environment_object_prefix,
+        )
+        return RedirectResponse(await resolved_container.store.presigned_get(object_key))
+
     @app.post("/internal/v1/studio/generations")
     async def studio_generate(
         body: StudioGenerateRequest,
         context: Context,
     ) -> ApiResponse[StudioGenerateResult]:
-        run = await studio_service.start(
+        runs = await studio_service.start_many(
             body,
             tenant_id=context.tenant_id,
             trace_id=context.trace_id,
+        )
+        run = runs[0]
+        run_items = tuple(
+            {
+                "taskId": item.task_id,
+                "runId": item.run_id,
+                "stage": item.stage.value,
+                "statusUrl": f"/internal/v1/runs/{item.run_id}",
+            }
+            for item in runs
         )
         return ApiResponse(
             requestId=context.request_id,
@@ -369,8 +460,21 @@ def create_app(
                 runId=run.run_id,
                 stage=run.stage.value,
                 statusUrl=f"/internal/v1/runs/{run.run_id}",
+                runs=run_items,
             ),
         )
+
+    @app.post("/internal/v1/studio/publications")
+    async def studio_publish(
+        body: StudioPublishRequest,
+        context: Context,
+    ) -> ApiResponse[StudioPublishResult]:
+        result = await studio_service.publish(
+            body,
+            tenant_id=context.tenant_id,
+            trace_id=context.trace_id,
+        )
+        return ApiResponse(requestId=context.request_id, data=result)
 
     @app.post("/internal/v1/media/probe")
     async def media_probe(
@@ -418,12 +522,50 @@ def create_app(
         result = render_preflight(body.timeline, body.input_manifest, body.output_profile)
         return ApiResponse(requestId=context.request_id, data=result)
 
+    @app.get("/internal/v1/runs")
+    async def list_runs(context: Context, limit: int = 20) -> ApiResponse[dict[str, Any]]:
+        runs = await resolved_container.repository.list_recent(context.tenant_id, limit)
+        return ApiResponse(
+            requestId=context.request_id,
+            data={
+                "runs": [run.model_dump(by_alias=True, mode="json") for run in runs],
+            },
+        )
+
     @app.get("/internal/v1/runs/{run_id}")
     async def get_run(run_id: str, context: Context) -> ApiResponse[RenderRun]:
         run = await resolved_container.repository.get(run_id, context.tenant_id)
         if not run:
             raise PlatformError(ErrorCode.RUN_NOT_FOUND, "Run 不存在")
         return ApiResponse(requestId=context.request_id, data=run)
+
+    @app.get("/internal/v1/runs/{run_id}/stream")
+    async def stream_run(run_id: str, context: Context) -> StreamingResponse:
+        first = await resolved_container.repository.get(run_id, context.tenant_id)
+        if not first:
+            raise PlatformError(ErrorCode.RUN_NOT_FOUND, "Run 不存在")
+
+        async def generate() -> AsyncIterator[str]:
+            last_sequence = -1
+            while True:
+                run = await resolved_container.repository.get(run_id, context.tenant_id)
+                if not run:
+                    break
+                if run.sequence != last_sequence:
+                    last_sequence = run.sequence
+                    yield json.dumps(
+                        run.model_dump(by_alias=True, mode="json"),
+                        ensure_ascii=False,
+                    ) + "\n"
+                if run.stage in TERMINAL_STAGES:
+                    break
+                await asyncio.sleep(0.8)
+
+        return StreamingResponse(
+            generate(),
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @app.post("/internal/v1/runs/{run_id}:cancel")
     async def cancel_run(

@@ -32,6 +32,8 @@ class ObjectStore(Protocol):
 class RunRepository(Protocol):
     async def get(self, run_id: str, tenant_id: int | None = None) -> RenderRun | None: ...
 
+    async def list_recent(self, tenant_id: int, limit: int = 20) -> list[RenderRun]: ...
+
     async def upsert(self, run: RenderRun) -> None: ...
 
     async def record_model_call(
@@ -50,9 +52,7 @@ class RunRepository(Protocol):
         value: dict[str, Any],
     ) -> None: ...
 
-    async def search_knowledge(
-        self, tenant_id: int, query: str, limit: int = 8
-    ) -> list[dict[str, Any]]: ...
+    async def search_knowledge(self, tenant_id: int, query: str, limit: int = 8) -> list[dict[str, Any]]: ...
 
     async def health(self) -> bool: ...
 
@@ -99,6 +99,45 @@ class ModelClient(Protocol):
         json_schema: dict[str, Any],
         max_tokens: int,
     ) -> tuple[dict[str, Any], dict[str, Any]]: ...
+
+
+class TextToSpeechClient(Protocol):
+    async def synthesize(
+        self,
+        text: str,
+        output: Path,
+        *,
+        cuid: str,
+        voice: int | None = None,
+        speed: int | None = None,
+        pitch: int | None = None,
+        volume: int | None = None,
+    ) -> None: ...
+
+
+class ImageGenerationClient(Protocol):
+    async def generate_images(
+        self,
+        prompts: tuple[str, ...],
+        output_dir: Path,
+        *,
+        width: int,
+        height: int,
+        on_progress: Callable[[int, int], Awaitable[None]] | None = None,
+    ) -> list[Path]: ...
+
+
+class VideoGenerationClient(Protocol):
+    async def generate_videos(
+        self,
+        prompts: tuple[str, ...],
+        output_dir: Path,
+        *,
+        ratio: str,
+        duration_seconds: int,
+        reference_images: tuple[Path | None, ...] = (),
+        on_progress: Callable[[int, int], Awaitable[None]] | None = None,
+    ) -> list[Path]: ...
 
 
 class MediaRunner(Protocol):
