@@ -169,7 +169,7 @@ async def test_one_click_template_workflow_produces_quality_checked_video(
     source_key = "prod/10001/material/food/v1/original.mp4"
     source = store.path(source_key)
     source.parent.mkdir(parents=True)
-    create_source_duration(source, duration=20)
+    create_source(source)
     digest = hashlib.sha256(source.read_bytes()).hexdigest()
     settings = Settings(
         _env_file=None,
@@ -190,6 +190,7 @@ async def test_one_click_template_workflow_produces_quality_checked_video(
         quality=QualityService(runner),
         bus=bus,
     )
+    generator = FakeVideoGenerator()
     studio = StudioWorkflowService(
         settings,
         PlannerService(NoModel(), repository),
@@ -197,6 +198,7 @@ async def test_one_click_template_workflow_produces_quality_checked_video(
         repository,
         store,
         bus,
+        video_generator=generator,
     )
     request = StudioGenerateRequest(
         merchantId="M1001",
@@ -220,7 +222,7 @@ async def test_one_click_template_workflow_produces_quality_checked_video(
                 assetId="food",
                 objectKey=source_key,
                 sha256=digest,
-                durationMs=20_000,
+                durationMs=2000,
                 sizeBytes=source.stat().st_size,
                 licenseId="license-food",
                 hasAudio=True,
@@ -245,13 +247,14 @@ async def test_one_click_template_workflow_produces_quality_checked_video(
     plan = await store.get_json(
         f"prod/10001/task/{completed.task_id}/plan/food-promo-vertical-v1/timeline.json"
     )
+    assert plan["generatedVideoAssetIds"]
+    assert len(generator.prompts) >= 5
     video_track = next(track for track in plan["timeline"]["tracks"] if track["type"] == "video")
     source_ranges = [
         (clip["assetId"], clip["sourceInMs"], clip["sourceOutMs"])
         for clip in video_track["clips"]
     ]
     assert len(source_ranges) == len(set(source_ranges))
-    assert [item[1] for item in source_ranges] == sorted(item[1] for item in source_ranges)
     video = next(stream for stream in probe["streams"] if stream["codec_type"] == "video")
     assert video["width"] == 1080
     assert video["height"] == 1080

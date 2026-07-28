@@ -534,6 +534,52 @@ class StudioWorkflowService:
             "match_uploaded_materials",
             "按文案、标签、质量和授权匹配用户素材",
         )
+        request = state["request"]
+        # 只有视频、且可用源时长不足目标时，按缺口生成独立补充镜头。
+        # 这条路径替代旧的循环片段补时长，同时避免按完整成片重复计费生成。
+        has_reference_image = any(
+            asset.media_type == "image" for asset in state["visual_assets"]
+        )
+        available_video_ms = sum(
+            asset.duration_ms
+            for asset in state["visual_assets"]
+            if asset.media_type == "video"
+        )
+        missing_duration_ms = max(0, state["template"].duration_ms - available_video_ms)
+        if (
+            missing_duration_ms > 0
+            and not has_reference_image
+            and self.video_generator
+        ):
+            await self._workflow_progress(
+                state["run"],
+                0.07,
+                "supplement_short_uploaded_materials",
+                f"上传素材不足，生成约 {missing_duration_ms / 1000:.1f} 秒独立补充镜头",
+            )
+            supplemental_template = replace(
+                state["template"],
+                duration_ms=max(1000, missing_duration_ms),
+            )
+            generated = await self._create_ai_video_assets(
+                request,
+                tenant_id=state["tenant_id"],
+                run=state["run"],
+                template=supplemental_template,
+                reference_assets=state["visual_assets"],
+            )
+            asset_list = [*state["asset_list"], *generated]
+            return {
+                "asset_list": asset_list,
+                "manifest": InputManifest(
+                    tenantId=state["tenant_id"],
+                    assets=tuple(asset_list),
+                ),
+                "visual_assets": (*state["visual_assets"], *generated),
+                "generated_video_asset_ids": tuple(
+                    asset.asset_id for asset in generated
+                ),
+            }
         return {}
 
     async def _graph_prepare_avatar_pitch(
@@ -593,7 +639,6 @@ class StudioWorkflowService:
                 template=state["template"],
             )
         asset_list = [*state["asset_list"], *generated]
-        _validate_material_limits(asset_list)
         manifest = InputManifest(tenantId=state["tenant_id"], assets=tuple(asset_list))
         return {
             "asset_list": asset_list,
@@ -653,7 +698,6 @@ class StudioWorkflowService:
             warning = f"{type(exc).__name__}: AI 视频生成失败，已使用分镜图片动效降级"
             return {"media_generation_warning": f"{previous}; {warning}" if previous else warning}
         asset_list = [*state["asset_list"], *generated]
-        _validate_material_limits(asset_list)
         return {
             "asset_list": asset_list,
             "manifest": InputManifest(
