@@ -72,6 +72,7 @@ WORKER_KIND=quality uv run hongying-worker
   → Kimi/DeepSeek 生成爆款文案、Brief、Storyboard
   → LangGraph 根据上传素材和视频方向路由
       ├─ 已上传素材：质量/标签/脚本规则匹配
+      ├─ 人物口播带货：单张人物图 → 人物口播智能体 → 同人物图生视频
       ├─ 火柴人、铅笔画：风格一致分镜图 + 转场（静态知识讲解）
       └─ 动漫短剧、儿童绘本、小人国、橘猫日常、商用营销：
          一致性分镜图 + 图生视频
@@ -91,6 +92,7 @@ WORKER_KIND=quality uv run hongying-worker
 validate_input
   → route_materials
     ├─ match_uploaded_materials
+    │   └─ avatar_spokesperson_agent（人物口播方向）
     └─ generate_scene_images
         ├─ use_static_scene_sequence
         └─ generate_dynamic_scene_videos
@@ -122,6 +124,12 @@ ARK_VIDEO_MODEL=你的 Seedance 视频模型或接入点 ID
 联调；但动漫、绘本、小人国等方向要得到可商用的模型生成画面，必须配置真实
 图片和视频模型。火柴人、铅笔画方向固定使用一致性分镜图和确定性转场，不把
 不稳定的文生视频结果直接拼入作品。
+
+人物口播带货位于生成方向第 2 项。该方向强制选择 1 张人物图片并确认肖像与
+商用授权；`avatar_spokesperson_agent` 会锁定这张参考图，让所有动态镜头复用
+同一人物身份，随后叠加已确认文案、百度配音和按实际配音时长生成的字幕。
+当前方舟 Seedance 路径负责人物自然说话动作，百度 TTS 负责声音；如果需要
+逐音素级嘴型同步，还需配置支持“人物图 + 音频”驱动的数字人/对口型模型。
 
 MinIO 管理控制台为 `http://localhost:9003`，S3 API 为
 `http://localhost:9000`，默认桶为 `hongying`。MinIO SDK 必须连接 S3 API，

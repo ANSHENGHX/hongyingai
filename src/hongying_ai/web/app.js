@@ -11,6 +11,7 @@ const state = {
   tasks: [],
   notifiedRuns: new Set(),
   directionTouched: false,
+  avatarAssetId: null,
 };
 const $ = (id) => document.getElementById(id);
 
@@ -21,6 +22,7 @@ const platformLabels = {
 };
 const generationDirections = [
   { id: "merchant_promo", icon: "🔥", title: "商户爆款推广", desc: "推广+真实场景+卖点证明+语音字幕" },
+  { id: "avatar_product_pitch", icon: "🎙", title: "人物口播带货", desc: "上传1张人物照+产品口播+语音字幕" },
   { id: "knowledge_stickman", icon: "☻", title: "火柴人知识讲解", desc: "知识+静态火柴人+语音字幕" },
   { id: "knowledge_pencil", icon: "✎", title: "铅笔画知识讲解", desc: "知识+静态铅笔画+语音字幕" },
   { id: "miniature_world", icon: "🌿", title: "微缩景观小人国", desc: "故事+动态小人国+背景音乐" },
@@ -30,6 +32,7 @@ const generationDirections = [
 ];
 const directionDefaultVoices = {
   merchant_promo: "baidu_hot_female",
+  avatar_product_pitch: "baidu_hot_female",
   knowledge_stickman: "baidu_hot_male",
   knowledge_pencil: "baidu_story_male",
   miniature_world: "baidu_hot_female",
@@ -88,6 +91,28 @@ function selectedDirection() {
 function selectDirection(direction) {
   const radio = document.querySelector(`input[name="generationDirection"][value="${CSS.escape(direction || "merchant_promo")}"]`);
   if (radio) radio.checked = true;
+  updateAvatarPitchPanel();
+}
+
+function renderAvatarPreview() {
+  const selectedId = $("avatarAsset")?.value || state.avatarAssetId;
+  const item = state.assets.find((candidate) => candidate.asset.assetId === selectedId);
+  const root = $("avatarPreview");
+  if (!root) return;
+  if (!item) {
+    root.innerHTML = "<span>尚未选择人物照片</span>";
+    return;
+  }
+  root.innerHTML = item.thumbnailUrl
+    ? `<img src="${escapeHtml(item.thumbnailUrl)}" alt="${escapeHtml(item.fileName)}人物照片"><strong>${escapeHtml(item.fileName)}</strong>`
+    : `<span>人物照片已选择</span><strong>${escapeHtml(item.fileName)}</strong>`;
+}
+
+function updateAvatarPitchPanel() {
+  const panel = $("avatarPitchPanel");
+  if (!panel) return;
+  panel.hidden = selectedDirection() !== "avatar_product_pitch";
+  if (!panel.hidden) renderAvatarPreview();
 }
 
 function toast(message) {
@@ -246,6 +271,7 @@ function renderDirections() {
       </span>
     </label>
   `).join("");
+  updateAvatarPitchPanel();
 }
 
 function typeLabel(asset) {
@@ -276,8 +302,20 @@ function renderAssets() {
   }
   const logo = state.assets.filter((item) => item.asset.mediaType === "image");
   const bgm = state.assets.filter((item) => item.asset.mediaType === "audio");
+  const avatar = $("avatarAsset");
+  if (avatar) {
+    const selectedAvatar = avatar.value || state.avatarAssetId || "";
+    avatar.innerHTML = `<option value="">请上传或选择人物照片</option>${logo.map((item) => `<option value="${escapeHtml(item.asset.assetId)}">${escapeHtml(item.fileName)}</option>`).join("")}`;
+    if (logo.some((item) => item.asset.assetId === selectedAvatar)) {
+      avatar.value = selectedAvatar;
+      state.avatarAssetId = selectedAvatar;
+    } else {
+      state.avatarAssetId = null;
+    }
+  }
   $("logoAsset").innerHTML = `<option value="">不添加 Logo</option>${logo.map((item) => `<option value="${escapeHtml(item.asset.assetId)}">${escapeHtml(item.fileName)}</option>`).join("")}`;
   $("bgmAsset").innerHTML = `<option value="">使用素材原声</option>${bgm.map((item) => `<option value="${escapeHtml(item.asset.assetId)}">${escapeHtml(item.fileName)}</option>`).join("")}`;
+  renderAvatarPreview();
 }
 
 async function loadAssets() {
@@ -315,20 +353,21 @@ function renderTaskCenter() {
 }
 
 async function uploadAssets(files) {
-  if (!files.length) return;
+  if (!files.length) return [];
   const existingVideos = state.assets.filter((item) => item.asset.mediaType === "video").length;
   const existingImages = state.assets.filter((item) => item.asset.mediaType === "image").length;
   const incomingVideos = files.filter((file) => mediaKindFromFile(file) === "video").length;
   const incomingImages = files.filter((file) => mediaKindFromFile(file) === "image").length;
   if (existingVideos + incomingVideos > 9) {
     toast(`视频素材最多 9 段，当前素材库已有 ${existingVideos} 段`);
-    return;
+    return [];
   }
   if (existingImages + incomingImages > 100) {
     toast(`图片素材最多 100 张，当前素材库已有 ${existingImages} 张`);
-    return;
+    return [];
   }
   const box = $("uploadState");
+  const uploaded = [];
   box.hidden = false;
   resetAiProgress("素材解析进度", ["上传素材", "分析媒体", "生成缩略图", "写入素材库"]);
   for (let index = 0; index < files.length; index += 1) {
@@ -341,6 +380,7 @@ async function uploadAssets(files) {
       headers: headers(false),
       body: form,
     });
+    uploaded.push(result);
     updateAiStep("分析媒体", "done", Math.round(((index + 0.6) / files.length) * 80), "正在分析素材质量");
     state.assets.unshift(result);
     renderAssets();
@@ -349,11 +389,15 @@ async function uploadAssets(files) {
   updateAiStep("写入素材库", "done", 100, "素材解析完成");
   box.textContent = `已完成 ${files.length} 个素材的上传与解析`;
   setTimeout(() => { box.hidden = true; }, 2800);
+  return uploaded;
 }
 
 function selectedAssets() {
   const selected = new Set([...document.querySelectorAll(".asset-check:checked")].map((node) => node.value));
-  for (const role of [$("logoAsset").value, $("bgmAsset").value]) if (role) selected.add(role);
+  const avatar = selectedDirection() === "avatar_product_pitch" ? $("avatarAsset").value : "";
+  for (const role of [avatar, $("logoAsset").value, $("bgmAsset").value]) {
+    if (role) selected.add(role);
+  }
   return state.assets.filter((item) => selected.has(item.asset.assetId)).map((item) => item.asset);
 }
 
@@ -683,6 +727,21 @@ async function generate(event) {
     if (!filled) return;
   }
   const assets = selectedAssets();
+  const avatarAssetId = selectedDirection() === "avatar_product_pitch"
+    ? $("avatarAsset").value
+    : null;
+  if (selectedDirection() === "avatar_product_pitch" && !avatarAssetId) {
+    toast("人物口播带货需要先上传并选择 1 张人物照片");
+    $("avatarPitchPanel").scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  if (
+    selectedDirection() === "avatar_product_pitch"
+    && !$("avatarCommercialConsent").checked
+  ) {
+    toast("请先确认已获得人物肖像与商用授权");
+    return;
+  }
   const selectedTemplate = document.querySelector('input[name="template"]:checked');
   if (!selectedTemplate) {
     toast("请选择视频模板");
@@ -707,6 +766,10 @@ async function generate(event) {
     targetPlatforms: platforms,
     templateId: selectedTemplate.value,
     assets,
+    avatarAssetId,
+    avatarCommercialConsent: selectedDirection() === "avatar_product_pitch"
+      ? $("avatarCommercialConsent").checked
+      : false,
     logoAssetId: $("logoAsset").value || null,
     bgmAssetId: $("bgmAsset").value || null,
     sellingPoints: splitList($("sellingPoints").value),
@@ -726,7 +789,10 @@ async function generate(event) {
   $("generateButton").disabled = true;
   stopRunStreams();
   state.runSnapshots.clear();
-  resetAiProgress("AI 视频生成进度", ["提交任务", "生成文案与分镜", "视觉素材生成", "配音与时间线", "FFmpeg 合成", "质量检测", "生成作品"]);
+  const visualStep = selectedDirection() === "avatar_product_pitch"
+    ? "人物口播智能体"
+    : "视觉素材生成";
+  resetAiProgress("AI 视频生成进度", ["提交任务", "生成文案与分镜", visualStep, "配音与时间线", "FFmpeg 合成", "质量检测", "生成作品"]);
   updateAiStep("提交任务", "active", 5);
   try {
     const result = await api("/internal/v1/studio/generations", {
@@ -806,6 +872,33 @@ async function init() {
     state.directionTouched = true;
     const voice = directionDefaultVoices[selectedDirection()];
     if (voice) $("ttsVoice").value = voice;
+    updateAvatarPitchPanel();
+  });
+  $("avatarAsset").addEventListener("change", (event) => {
+    state.avatarAssetId = event.target.value || null;
+    renderAvatarPreview();
+  });
+  $("avatarUpload").addEventListener("change", async (event) => {
+    const [file] = [...event.target.files];
+    event.target.value = "";
+    if (!file) return;
+    if (mediaKindFromFile(file) !== "image") {
+      toast("人物参考素材只能上传图片");
+      return;
+    }
+    try {
+      const uploaded = await uploadAssets([file]);
+      const item = uploaded[0];
+      if (item) {
+        state.avatarAssetId = item.asset.assetId;
+        renderAssets();
+        $("avatarAsset").value = item.asset.assetId;
+        renderAvatarPreview();
+        toast("人物照片已上传并选中");
+      }
+    } catch (error) {
+      toast(error.message);
+    }
   });
   $("assetUpload").addEventListener("change", async (event) => {
     try { await uploadAssets([...event.target.files]); }

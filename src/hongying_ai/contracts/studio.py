@@ -9,6 +9,7 @@ from hongying_ai.domain.models import AssetManifestEntry, ContractModel
 PublishPlatform = Literal["douyin", "kuaishou", "wechat_channels"]
 GenerationDirection = Literal[
     "merchant_promo",
+    "avatar_product_pitch",
     "knowledge_stickman",
     "knowledge_pencil",
     "miniature_world",
@@ -100,6 +101,8 @@ class StudioGenerateRequest(ContractModel):
     target_platforms: tuple[PublishPlatform, ...] = ()
     template_id: str
     assets: tuple[AssetManifestEntry, ...] = ()
+    avatar_asset_id: str | None = None
+    avatar_commercial_consent: bool = False
     logo_asset_id: str | None = None
     bgm_asset_id: str | None = None
     selling_points: tuple[str, ...] = ()

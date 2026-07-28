@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import mimetypes
+import re
 import shutil
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -104,6 +105,19 @@ GENERATION_DIRECTIONS: dict[str, dict[str, str]] = {
         ),
         "negative": "不要无关品牌、不要随机城市空镜、不要测试画面、不要杂乱拼贴。",
     },
+    "avatar_product_pitch": {
+        "name": "人物口播带货",
+        "recipe": "单人物参考图+产品口播+自然表情动作+语音字幕",
+        "prompt": (
+            "严格保持参考照片中的同一人物身份、五官、发型和服装稳定；人物正面面对镜头，"
+            "自然眨眼、轻微点头和手势，像真实主播介绍产品；画面干净专业，产品卖点清楚，"
+            "适合抖音、快手、视频号商业口播。"
+        ),
+        "negative": (
+            "禁止更换人物、禁止多人、禁止脸部变形、禁止身份漂移、禁止夸张肢体、"
+            "禁止嘴部撕裂、禁止无关产品、禁止文字水印和测试画面。"
+        ),
+    },
     "knowledge_stickman": {
         "name": "火柴人知识讲解",
         "recipe": "知识+静态火柴人+语音字幕",
@@ -185,6 +199,7 @@ class StudioWorkflowService:
             prepare=self._graph_prepare,
             route_materials=self._graph_route_materials,
             match_uploaded=self._graph_match_uploaded,
+            prepare_avatar_pitch=self._graph_prepare_avatar_pitch,
             generate_images=self._graph_generate_images,
             use_static_scenes=self._graph_use_static_scenes,
             generate_dynamic_scenes=self._graph_generate_dynamic_scenes,
@@ -376,6 +391,8 @@ class StudioWorkflowService:
                 "activityTitle": request.activity_title,
                 "templateId": request.template_id,
                 "generationDirection": request.options.generation_direction,
+                "avatarAssetId": request.avatar_asset_id,
+                "avatarCommercialConsent": request.avatar_commercial_consent,
                 "ttsVoice": request.options.tts_voice,
                 "topic": request.topic,
                 "script": request.script,
@@ -452,6 +469,7 @@ class StudioWorkflowService:
         manifest = InputManifest(tenantId=tenant_id, assets=tuple(asset_list))
         asset_ids = set(manifest.by_id())
         for role, asset_id in (
+            ("人物照片", request.avatar_asset_id),
             ("logo", request.logo_asset_id),
             ("bgm", request.bgm_asset_id),
         ):
@@ -464,6 +482,23 @@ class StudioWorkflowService:
             raise PlatformError(ErrorCode.INVALID_COMMAND, "Logo 必须选择图片素材")
         if request.bgm_asset_id and manifest.by_id()[request.bgm_asset_id].media_type != "audio":
             raise PlatformError(ErrorCode.INVALID_COMMAND, "BGM 必须选择音频素材")
+        if request.options.generation_direction == "avatar_product_pitch":
+            if not request.avatar_asset_id:
+                raise PlatformError(
+                    ErrorCode.INVALID_COMMAND,
+                    "人物口播带货必须上传并选择 1 张人物照片",
+                )
+            avatar = manifest.by_id()[request.avatar_asset_id]
+            if avatar.media_type != "image":
+                raise PlatformError(
+                    ErrorCode.INVALID_COMMAND,
+                    "人物口播参考素材必须是图片",
+                )
+            if not request.avatar_commercial_consent:
+                raise PlatformError(
+                    ErrorCode.INVALID_COMMAND,
+                    "请确认已获得人物肖像与商用授权",
+                )
         return {
             "template": template,
             "asset_list": asset_list,
@@ -500,6 +535,30 @@ class StudioWorkflowService:
             "按文案、标签、质量和授权匹配用户素材",
         )
         return {}
+
+    async def _graph_prepare_avatar_pitch(
+        self,
+        state: StudioGraphState,
+        config: RunnableConfig,
+    ) -> dict[str, Any]:
+        request = state["request"]
+        avatar = state["manifest"].by_id()[request.avatar_asset_id]
+        await self._workflow_progress(
+            state["run"],
+            0.07,
+            "avatar_spokesperson_agent",
+            "人物口播智能体锁定人物形象并拆解产品讲解镜头",
+        )
+        return {
+            "avatar_agent": {
+                "agent": "avatar-spokesperson-v1",
+                "avatarAssetId": avatar.asset_id,
+                "identityConsistency": "strict",
+                "commercialConsent": request.avatar_commercial_consent,
+                "productGoal": request.user_goal,
+                "scriptSource": "confirmed-script",
+            }
+        }
 
     async def _graph_generate_images(
         self,
@@ -840,6 +899,11 @@ class StudioWorkflowService:
                     if state["material_route"] == "uploaded"
                     else "generate_scene_images"
                 ),
+                *(
+                    ["avatar_spokesperson_agent"]
+                    if request.options.generation_direction == "avatar_product_pitch"
+                    else []
+                ),
                 (
                     "generate_dynamic_scene_videos"
                     if state["scene_route"] == "dynamic" and state.get("generated_video_asset_ids")
@@ -852,6 +916,7 @@ class StudioWorkflowService:
                 "composer_ffmpeg_quality",
             ],
             "merchant": {"id": request.merchant_id, "name": request.merchant_name},
+            "avatarAgent": state.get("avatar_agent"),
             "activity": {
                 "id": request.activity_id,
                 "title": request.activity_title,
@@ -970,6 +1035,10 @@ class StudioWorkflowService:
             clip_count = _ai_video_clip_count(self.settings, template)
             prompts = _ai_scene_video_prompts(request, template, clip_count)
             image_references = tuple(asset for asset in reference_assets if asset.media_type == "image")
+            if request.options.generation_direction == "avatar_product_pitch" and request.avatar_asset_id:
+                image_references = tuple(
+                    asset for asset in image_references if asset.asset_id == request.avatar_asset_id
+                )
             reference_paths: list[Path | None] = []
             reference_dir = work_dir / "reference"
             reference_dir.mkdir(parents=True, exist_ok=True)
@@ -1427,6 +1496,7 @@ def _content_subject(request: StudioGenerateRequest | StudioScriptRequest) -> st
 
 def _default_voice_for_direction(direction: str) -> str:
     return {
+        "avatar_product_pitch": "baidu_hot_female",
         "knowledge_stickman": "baidu_hot_male",
         "knowledge_pencil": "baidu_story_male",
         "miniature_world": "baidu_hot_female",
@@ -1437,6 +1507,8 @@ def _default_voice_for_direction(direction: str) -> str:
 
 
 def _infer_generation_direction(goal: str, activity_type: str) -> str:
+    if any(word in goal for word in ("人物口播", "真人口播", "数字人口播", "主播介绍")):
+        return "avatar_product_pitch"
     if any(word in goal for word in ("火柴人", "简笔人")):
         return "knowledge_stickman"
     if any(word in goal for word in ("铅笔画", "手绘", "线稿")):
@@ -1577,6 +1649,19 @@ def _ai_scene_video_prompts(
         ),
         (f"生成补充镜头，关键词：{', '.join(points[:4])}。视觉风格与前面一致，有传播感、真实感、商业可用。"),
     ]
+    if request.options.generation_direction == "avatar_product_pitch":
+        pitch_lines = tuple(
+            part.strip() for part in re.split(r"(?<=[。！？!?；;])", script) if part.strip()
+        ) or (script,)
+        scenes = [
+            (
+                "参考照片中的同一人物正面面对镜头，以强钩子开场介绍产品；"
+                f"本镜头口播语义：{pitch_lines[index % len(pitch_lines)][:90]}。"
+                "人物自然眨眼、嘴部连续说话、轻微点头和手势，胸像景别，镜头稳定轻推；"
+                "保持五官、发型、服装和背景连续一致，产品可自然拿在手中或摆在身旁。"
+            )
+            for index in range(clip_count)
+        ]
     prompt_prefix = (
         f"生成 {template.width}x{template.height} {direction['name']} 短视频素材。"
         f"类型配方：{direction['recipe']}。视觉要求：{direction['prompt']}。"
@@ -2072,6 +2157,8 @@ def _infer_topic(goal: str) -> str:
 
 
 def _fallback_title(request: StudioScriptRequest, subject: str) -> str:
+    if request.generation_direction == "avatar_product_pitch":
+        return f"真人出镜讲清楚｜{request.topic}"
     if request.generation_direction == "knowledge_stickman":
         return f"{request.topic}：用火柴人讲清楚"
     if request.generation_direction == "knowledge_pencil":
@@ -2087,6 +2174,8 @@ def _fallback_title(request: StudioScriptRequest, subject: str) -> str:
 
 
 def _fallback_opening(request: StudioScriptRequest, subject: str) -> str:
+    if request.generation_direction == "avatar_product_pitch":
+        return f"镜头前直接说重点：为什么最近大家都在关注{request.topic}？"
     if request.generation_direction in {"knowledge_stickman", "knowledge_pencil"}:
         return f"“{request.topic}”别再硬讲了，换成这套结构，观众一眼就懂。"
     if request.generation_direction in {
@@ -2108,6 +2197,14 @@ def _fallback_script_lines(
 ) -> list[str]:
     first = points[0]
     second = points[min(1, len(points) - 1)]
+    if request.generation_direction == "avatar_product_pitch":
+        return [
+            opening,
+            f"我是{request.merchant_name}的产品介绍人，今天只讲两个你最关心的点。",
+            f"第一，{first}，这不是空口推荐，使用场景和细节都可以直接看见。",
+            f"第二，{second}，适合真正关心{request.topic}的人。",
+            f"想进一步了解{request.activity_title}，现在就收藏这条，到{subject}实际体验。",
+        ]
     if request.generation_direction in {"knowledge_stickman", "knowledge_pencil"}:
         return [
             opening,

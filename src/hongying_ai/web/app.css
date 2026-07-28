@@ -215,6 +215,63 @@ textarea { min-height: 84px; resize: vertical; }
   font-style: normal;
   line-height: 1.45;
 }
+.avatar-pitch-panel {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid rgba(255, 107, 53, .48);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at top left, rgba(255, 107, 53, .16), transparent 42%),
+    var(--panel-2);
+}
+.avatar-pitch-panel[hidden] { display: none; }
+.avatar-pitch-copy h3 { margin: 9px 0 7px; font-size: 18px; }
+.avatar-pitch-copy p,
+.avatar-pitch-copy li { color: var(--muted); font-size: 12px; line-height: 1.65; }
+.avatar-pitch-copy ul { margin: 10px 0 0; padding-left: 18px; }
+.avatar-pitch-badge {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: var(--hot-2);
+  background: rgba(255, 107, 53, .13);
+  font-size: 11px;
+  font-weight: 900;
+}
+.avatar-pitch-control { display: grid; gap: 10px; }
+.avatar-upload-button { margin-left: 0; justify-content: center; }
+.avatar-consent {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.avatar-consent input { width: 18px; height: 18px; accent-color: var(--hot); }
+.avatar-preview {
+  min-height: 116px;
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: var(--panel-3);
+}
+.avatar-preview img {
+  width: 72px;
+  height: 96px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.avatar-preview strong { color: var(--text); font-size: 12px; overflow-wrap: anywhere; }
 .settings-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -481,7 +538,7 @@ textarea { min-height: 84px; resize: vertical; }
   .panel-heading { align-items: start; }
   .goal-box { grid-template-columns: 1fr; }
   .goal-box .wide { grid-column: auto; }
-  .field-grid, .settings-grid, .role-fields { grid-template-columns: 1fr; }
+  .field-grid, .settings-grid, .role-fields, .avatar-pitch-panel { grid-template-columns: 1fr; }
   .wide { grid-column: auto; }
   .template-list, .asset-list, .direction-list { grid-template-columns: 1fr; }
   .launch-panel { align-items: stretch; flex-direction: column; }

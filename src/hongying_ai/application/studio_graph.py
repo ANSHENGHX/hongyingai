@@ -37,6 +37,7 @@ class StudioGraphState(TypedDict, total=False):
     # --- 生成结果与资产 ID ---
     generated_image_asset_ids: tuple[str, ...]  # 生成的图片资产 ID 列表
     generated_video_asset_ids: tuple[str, ...]  # 生成的视频资产 ID 列表
+    avatar_agent: dict[str, Any]  # 人物口播智能体的身份锁定与脚本策略
     narration_asset_id: str | None  # 旁白/配音资产 ID
     effective_bgm_asset_id: str | None  # 最终使用的背景音乐 (BGM) 资产 ID
 
@@ -65,6 +66,7 @@ def build_studio_graph(
     prepare: GraphNode,
     route_materials: GraphNode,
     match_uploaded: GraphNode,
+    prepare_avatar_pitch: GraphNode,
     generate_images: GraphNode,
     use_static_scenes: GraphNode,
     generate_dynamic_scenes: GraphNode,
@@ -85,6 +87,7 @@ def build_studio_graph(
         prepare: 输入验证与初始化准备节点。
         route_materials: 素材路由节点，决定使用上传素材还是生成新素材。
         match_uploaded: 匹配已上传素材节点。
+        prepare_avatar_pitch: 校验人物参考图并准备口播镜头策略。
         generate_images: 生成场景图片节点。
         use_static_scenes: 使用静态图片序列作为场景节点。
         generate_dynamic_scenes: 生成动态视频场景节点。
@@ -106,6 +109,7 @@ def build_studio_graph(
     builder.add_node("validate_input", prepare)  # 验证输入并初始化状态
     builder.add_node("route_materials", route_materials)  # 决定素材来源路由
     builder.add_node("match_uploaded_materials", match_uploaded)  # 匹配用户上传的素材
+    builder.add_node("avatar_spokesperson_agent", prepare_avatar_pitch)  # 人物口播智能体
     builder.add_node("generate_scene_images", generate_images)  # 调用模型生成场景图片
     builder.add_node("use_static_scene_sequence", use_static_scenes)  # 处理静态图片场景序列
     builder.add_node("generate_dynamic_scene_videos", generate_dynamic_scenes)  # 处理动态视频场景生成
@@ -153,16 +157,22 @@ def build_studio_graph(
     builder.add_conditional_edges(
         "match_uploaded_materials",
         lambda state: (
-            "dynamic"
-            if state["scene_route"] == "dynamic"
-            and any(getattr(asset, "media_type", None) == "image" for asset in state["visual_assets"])
-            else "direct"
+            "avatar"
+            if state["request"].options.generation_direction == "avatar_product_pitch"
+            else (
+                "dynamic"
+                if state["scene_route"] == "dynamic"
+                and any(getattr(asset, "media_type", None) == "image" for asset in state["visual_assets"])
+                else "direct"
+            )
         ),
         {
+            "avatar": "avatar_spokesperson_agent",
             "dynamic": "generate_dynamic_scene_videos",
             "direct": "generate_voiceover",
         },
     )
+    builder.add_edge("avatar_spokesperson_agent", "generate_dynamic_scene_videos")
     builder.add_edge("use_static_scene_sequence", "generate_voiceover")
     builder.add_edge("generate_dynamic_scene_videos", "generate_voiceover")
 

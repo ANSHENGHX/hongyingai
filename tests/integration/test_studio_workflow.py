@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from PIL import Image
 
 from hongying_ai.application.planner import PlannerService
 from hongying_ai.application.quality import QualityService
@@ -132,6 +133,7 @@ def create_source_duration(path: Path, *, duration: int) -> None:
 class FakeVideoGenerator:
     def __init__(self) -> None:
         self.prompts: tuple[str, ...] = ()
+        self.reference_hashes: tuple[str | None, ...] = ()
 
     async def generate_videos(
         self,
@@ -144,6 +146,9 @@ class FakeVideoGenerator:
         on_progress=None,
     ) -> list[Path]:
         self.prompts = prompts
+        self.reference_hashes = tuple(
+            hashlib.sha256(path.read_bytes()).hexdigest() if path else None for path in reference_images
+        )
         paths = []
         for index, _prompt in enumerate(prompts, start=1):
             path = output_dir / f"fake-ai-video-{index:02d}.mp4"
@@ -386,6 +391,139 @@ async def test_one_click_workflow_uses_ai_video_generator_without_user_assets(
     assert plan["mediaGenerationWarning"] is None
     assert plan["workflowEngine"] == "langgraph"
     assert all(asset_id.startswith("asset_ai_video_") for asset_id in plan["generatedVideoAssetIds"])
+
+
+@pytest.mark.asyncio
+async def test_avatar_product_pitch_requires_selected_portrait(tmp_path: Path) -> None:
+    settings = Settings(_env_file=None, app_work_dir=tmp_path / "work")
+    repository = MemoryRunRepository()
+    studio = StudioWorkflowService(
+        settings,
+        PlannerService(NoModel(), repository),
+        render=None,  # type: ignore[arg-type]
+        repository=repository,
+        store=LocalStore(tmp_path / "objects"),
+        bus=EventBus(),
+    )
+    request = StudioGenerateRequest(
+        merchantId="M1001",
+        merchantName="宏映火锅",
+        activityId="A-avatar-missing",
+        activityTitle="人物口播",
+        userGoal="上传人物照片后介绍产品",
+        templateId="food-promo-vertical-v1",
+        useAi=False,
+        options=StudioGenerationOptions(
+            generationDirection="avatar_product_pitch",
+            durationSeconds=15,
+        ),
+    )
+
+    waiting = await studio.start(request, tenant_id=10001, trace_id="trace-avatar-missing")
+    await asyncio.gather(*tuple(studio.tasks))
+    failed = await repository.get(waiting.run_id, 10001)
+
+    assert failed is not None
+    assert failed.stage == RunStage.FAILED
+    assert "必须上传并选择 1 张人物照片" in (failed.error_summary or "")
+
+
+@pytest.mark.asyncio
+async def test_avatar_product_pitch_uses_one_portrait_for_every_generated_clip(
+    tmp_path: Path,
+) -> None:
+    work = tmp_path / "work"
+    work.mkdir()
+    store = LocalStore(tmp_path / "objects")
+    avatar_key = "prod/10001/material/avatar/v1/original.jpg"
+    avatar_path = store.path(avatar_key)
+    avatar_path.parent.mkdir(parents=True)
+    Image.new("RGB", (720, 1080), (198, 146, 118)).save(avatar_path, "JPEG")
+    avatar_sha = hashlib.sha256(avatar_path.read_bytes()).hexdigest()
+    avatar = AssetManifestEntry(
+        assetId="avatar-person",
+        objectKey=avatar_key,
+        sha256=avatar_sha,
+        durationMs=90_000,
+        sizeBytes=avatar_path.stat().st_size,
+        licenseId="portrait-commercial-license",
+        mediaType="image",
+        hasAudio=False,
+        labels=("人物", "正面照", "商用授权"),
+        qualityScore=90,
+    )
+    settings = Settings(
+        _env_file=None,
+        app_work_dir=work,
+        environment_object_prefix="prod",
+        render_timeout_seconds=120,
+        ai_video_clip_duration_seconds=5,
+        ai_video_min_clip_count=3,
+    )
+    runner = FfmpegRunner()
+    repository = MemoryRunRepository()
+    coordination = MemoryCoordinationStore()
+    bus = EventBus()
+    render = RenderService(
+        settings=settings,
+        store=store,
+        coordination=coordination,
+        repository=repository,
+        runner=runner,
+        quality=QualityService(runner),
+        bus=bus,
+    )
+    generator = FakeVideoGenerator()
+    studio = StudioWorkflowService(
+        settings,
+        PlannerService(NoModel(), repository),
+        render,
+        repository,
+        store,
+        bus,
+        video_generator=generator,
+    )
+    request = StudioGenerateRequest(
+        merchantId="M1001",
+        merchantName="宏映火锅",
+        activityId="A-avatar",
+        activityTitle="人物口播新品介绍",
+        activityType="新品上市",
+        userGoal="让人物出镜介绍现切鲜牛肉双人套餐并引导到店",
+        topic="现切鲜牛肉双人套餐",
+        script="今天直接给你看宏映火锅现切鲜牛肉双人套餐。牛肉现切，锅底现炒，喜欢就到店体验。",
+        templateId="food-promo-vertical-v1",
+        avatarAssetId=avatar.asset_id,
+        avatarCommercialConsent=True,
+        useAi=False,
+        sellingPoints=("牛肉现切", "锅底现炒", "双人套餐"),
+        options=StudioGenerationOptions(
+            generationDirection="avatar_product_pitch",
+            videoAspect="9:16",
+            durationSeconds=15,
+            clipDurationSeconds=5,
+            transitionMode="cut",
+            renderCount=1,
+        ),
+        assets=(avatar,),
+    )
+
+    waiting = await studio.start(request, tenant_id=10001, trace_id="trace-avatar-pitch")
+    await asyncio.gather(*tuple(studio.tasks))
+    completed = await repository.get(waiting.run_id, 10001)
+
+    assert completed is not None
+    assert completed.stage == RunStage.COMPLETED, completed.error_summary
+    assert len(generator.prompts) == 3
+    assert all(value == avatar_sha for value in generator.reference_hashes)
+    assert all("同一人物" in prompt and "嘴部连续说话" in prompt for prompt in generator.prompts)
+    plan = await store.get_json(
+        f"prod/10001/task/{completed.task_id}/plan/food-promo-vertical-v1/timeline.json"
+    )
+    assert plan["avatarAgent"]["agent"] == "avatar-spokesperson-v1"
+    assert plan["avatarAgent"]["avatarAssetId"] == avatar.asset_id
+    assert "avatar_spokesperson_agent" in plan["workflowPath"]
+    assert len(plan["generatedVideoAssetIds"]) == 3
 
 
 @pytest.mark.asyncio

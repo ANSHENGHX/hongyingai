@@ -57,6 +57,35 @@
               <div><h2>选择生成方向</h2><p>不同方向会使用不同的视频结构、画面风格、配音字幕和音乐策略。</p></div>
             </div>
             <div id="directionList" class="direction-list" role="radiogroup" aria-label="生成方向"></div>
+            <div id="avatarPitchPanel" class="avatar-pitch-panel" hidden>
+              <div class="avatar-pitch-copy">
+                <span class="avatar-pitch-badge">人物口播智能体</span>
+                <h3>上传 1 张人物正面照</h3>
+                <p>AI 会保持人物五官、发型和服装一致，生成自然口播动作，再合成产品文案、配音和同步字幕。</p>
+                <ul>
+                  <li>建议单人、正面、半身、光线均匀</li>
+                  <li>请确认已获得人物肖像与商用授权</li>
+                </ul>
+              </div>
+              <div class="avatar-pitch-control">
+                <label>人物照片
+                  <select id="avatarAsset">
+                    <option value="">请上传或选择人物照片</option>
+                  </select>
+                </label>
+                <label class="upload-button avatar-upload-button">
+                  <input id="avatarUpload" type="file" accept="image/*">
+                  ＋ 上传人物照片
+                </label>
+                <label class="avatar-consent">
+                  <input id="avatarCommercialConsent" type="checkbox">
+                  <span>我已获得该人物的肖像权及本次商用授权</span>
+                </label>
+                <div id="avatarPreview" class="avatar-preview">
+                  <span>尚未选择人物照片</span>
+                </div>
+              </div>
+            </div>
           </article>
 
           <article class="panel">
