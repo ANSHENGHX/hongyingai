@@ -175,3 +175,65 @@ def test_template_rebuilds_clips_and_syncs_subtitles_to_narration(
         for left, right in zip(result.subtitles, result.subtitles[1:], strict=False)
     )
     assert validate_timeline(result, assets) == []
+
+
+def test_template_uses_non_overlapping_source_ranges_and_hard_target_duration(
+    timeline,
+) -> None:
+    asset = AssetManifestEntry(
+        assetId="long-video",
+        objectKey="prod/10001/material/long-video.mp4",
+        sha256="9" * 64,
+        durationMs=20_000,
+        sizeBytes=1000,
+        licenseId="license-long-video",
+        mediaType="video",
+        hasAudio=True,
+    )
+    assets = InputManifest(tenantId=10001, assets=(asset,))
+    storyboard = Storyboard(
+        title="连续非重复区间",
+        cta="立即了解",
+        shots=(
+            StoryboardShot(
+                id="shot-1",
+                narration="第一段",
+                visualIntent="开场",
+                durationMs=8000,
+                assetQuery="开场",
+                selectedAssetId=asset.asset_id,
+            ),
+            StoryboardShot(
+                id="shot-2",
+                narration="第二段",
+                visualIntent="讲解",
+                durationMs=8000,
+                assetQuery="讲解",
+                selectedAssetId=asset.asset_id,
+            ),
+            StoryboardShot(
+                id="shot-3",
+                narration="第三段",
+                visualIntent="收尾",
+                durationMs=4000,
+                assetQuery="收尾",
+                selectedAssetId=asset.asset_id,
+            ),
+        ),
+    )
+
+    result = apply_template(
+        timeline,
+        storyboard,
+        assets,
+        get_template("food-promo-vertical-v1"),
+    )
+
+    video = next(track for track in result.tracks if track.type == TrackType.VIDEO)
+    assert result.duration_ms == 15_000
+    assert [(clip.source_in_ms, clip.source_out_ms) for clip in video.clips] == [
+        (0, 8000),
+        (8000, 15_350),
+    ]
+    assert max(clip.timeline_start_ms + clip.duration_ms for clip in video.clips) == 15_000
+    assert validate_timeline(result, assets) == []

@@ -170,11 +170,13 @@ def apply_template(
     primary = next(track for track in base.tracks if track.type == TrackType.VIDEO)
     storyboard_clips: list[Clip] = []
     storyboard_cursor = 0
+    asset_source_offsets: dict[str, int] = {}
     for shot in storyboard.shots:
         if not shot.selected_asset_id or shot.selected_asset_id not in assets:
             continue
         asset = assets[shot.selected_asset_id]
-        duration = min(shot.duration_ms, asset.duration_ms)
+        source_in = asset_source_offsets.get(asset.asset_id, 0)
+        duration = min(shot.duration_ms, asset.duration_ms - source_in)
         if duration <= 0:
             continue
         storyboard_clips.append(
@@ -182,11 +184,14 @@ def apply_template(
                 id=f"clip_{shot.id}",
                 assetId=asset.asset_id,
                 timelineStartMs=storyboard_cursor,
-                sourceInMs=0,
-                sourceOutMs=duration,
+                sourceInMs=source_in,
+                sourceOutMs=source_in + duration,
                 durationMs=duration,
             )
         )
+        # 外部规划即使复用了同一视频，也从下一个未使用区间开始，
+        # 不再重复播放素材开头。
+        asset_source_offsets[asset.asset_id] = source_in + duration
         storyboard_cursor += duration
     source_clips = (
         tuple(storyboard_clips)
@@ -198,15 +203,31 @@ def apply_template(
     cursor = 0
     for source in source_clips:
         transform = source.transform.model_copy(update={"scale_mode": template.scale_mode})
-        duration = source.duration_ms
         overlap = 0
         if clips and template.transition != "cut":
-            overlap = min(template.transition_ms, clips[-1].duration_ms // 2, duration // 2)
+            overlap = min(
+                template.transition_ms,
+                clips[-1].duration_ms // 2,
+                source.duration_ms // 2,
+            )
+        remaining = template.duration_ms - cursor
+        if remaining <= 0:
+            break
+        duration = min(source.duration_ms, remaining + overlap)
+        if duration <= overlap:
+            break
+        source_span = max(1, round(duration * transform.speed))
+        source_out = min(source.source_out_ms, source.source_in_ms + source_span)
+        duration = max(1, round((source_out - source.source_in_ms) / transform.speed))
+        if clips and overlap:
+            overlap = min(overlap, duration // 2)
             cursor -= overlap
         clip = source.model_copy(
             update={
                 "timeline_start_ms": cursor,
                 "transform": transform,
+                "source_out_ms": source_out,
+                "duration_ms": duration,
             }
         )
         if clips and overlap:
@@ -221,7 +242,8 @@ def apply_template(
         clips.append(clip)
         cursor += duration
 
-    duration_ms = max(template.duration_ms, cursor)
+    # 成片时长是合成与计费的硬约束，配音和分镜都不能将它撑长。
+    duration_ms = template.duration_ms
     tracks: list[Track] = [Track(id="video-main", type=TrackType.VIDEO, clips=tuple(clips))]
 
     original_audio = tuple(
@@ -264,7 +286,15 @@ def apply_template(
 
     if narration_asset_id:
         narration = assets[narration_asset_id]
-        narration_duration = min(duration_ms, narration.duration_ms)
+        narration_speed = min(4.0, max(1.0, narration.duration_ms / duration_ms))
+        narration_source_out = min(
+            narration.duration_ms,
+            round(duration_ms * narration_speed),
+        )
+        narration_duration = min(
+            duration_ms,
+            round(narration_source_out / narration_speed),
+        )
         tracks.append(
             Track(
                 id="audio-narration",
@@ -275,8 +305,9 @@ def apply_template(
                         assetId=narration.asset_id,
                         timelineStartMs=0,
                         sourceInMs=0,
-                        sourceOutMs=narration_duration,
+                        sourceOutMs=narration_source_out,
                         durationMs=narration_duration,
+                        transform=Transform(speed=narration_speed),
                         volume=1.0,
                         fadeInMs=min(120, narration_duration // 4),
                         fadeOutMs=min(300, narration_duration // 4),

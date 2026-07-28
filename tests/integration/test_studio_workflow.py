@@ -169,7 +169,7 @@ async def test_one_click_template_workflow_produces_quality_checked_video(
     source_key = "prod/10001/material/food/v1/original.mp4"
     source = store.path(source_key)
     source.parent.mkdir(parents=True)
-    create_source(source)
+    create_source_duration(source, duration=20)
     digest = hashlib.sha256(source.read_bytes()).hexdigest()
     settings = Settings(
         _env_file=None,
@@ -220,7 +220,7 @@ async def test_one_click_template_workflow_produces_quality_checked_video(
                 assetId="food",
                 objectKey=source_key,
                 sha256=digest,
-                durationMs=2000,
+                durationMs=20_000,
                 sizeBytes=source.stat().st_size,
                 licenseId="license-food",
                 hasAudio=True,
@@ -239,7 +239,19 @@ async def test_one_click_template_workflow_produces_quality_checked_video(
     assert completed.output_object_key
     assert store.path(completed.output_object_key).exists()
     probe = await runner.probe(store.path(completed.output_object_key))
-    assert float(probe["format"]["duration"]) >= 20
+    assert abs(float(probe["format"]["duration"]) - 20) <= 0.25
+    assert completed.metadata["billingTargetDurationMs"] == 20_000
+    assert abs(completed.metadata["durationDeltaMs"]) <= 250
+    plan = await store.get_json(
+        f"prod/10001/task/{completed.task_id}/plan/food-promo-vertical-v1/timeline.json"
+    )
+    video_track = next(track for track in plan["timeline"]["tracks"] if track["type"] == "video")
+    source_ranges = [
+        (clip["assetId"], clip["sourceInMs"], clip["sourceOutMs"])
+        for clip in video_track["clips"]
+    ]
+    assert len(source_ranges) == len(set(source_ranges))
+    assert [item[1] for item in source_ranges] == sorted(item[1] for item in source_ranges)
     video = next(stream for stream in probe["streams"] if stream["codec_type"] == "video")
     assert video["width"] == 1080
     assert video["height"] == 1080
@@ -385,9 +397,9 @@ async def test_one_click_workflow_uses_ai_video_generator_without_user_assets(
 
     assert completed is not None
     assert completed.stage == RunStage.COMPLETED, completed.error_summary
-    assert len(generator.prompts) == 3
+    assert len(generator.prompts) == 5
     plan = await store.get_json(f"prod/10001/task/{completed.task_id}/plan/campaign-flash-v1/timeline.json")
-    assert len(plan["generatedVideoAssetIds"]) == 3
+    assert len(plan["generatedVideoAssetIds"]) == 5
     assert plan["mediaGenerationWarning"] is None
     assert plan["workflowEngine"] == "langgraph"
     assert all(asset_id.startswith("asset_ai_video_") for asset_id in plan["generatedVideoAssetIds"])
@@ -516,7 +528,8 @@ async def test_avatar_product_pitch_uses_one_portrait_for_every_generated_clip(
     assert completed.stage == RunStage.COMPLETED, completed.error_summary
     assert len(generator.prompts) == 3
     assert all(value == avatar_sha for value in generator.reference_hashes)
-    assert all("同一人物" in prompt and "嘴部连续说话" in prompt for prompt in generator.prompts)
+    assert all("同一人物" in prompt and "嘴唇持续" in prompt for prompt in generator.prompts)
+    assert len(set(generator.prompts)) == len(generator.prompts)
     plan = await store.get_json(
         f"prod/10001/task/{completed.task_id}/plan/food-promo-vertical-v1/timeline.json"
     )

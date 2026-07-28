@@ -152,6 +152,16 @@ class RenderService:
                 command.output_profile,
                 expected_duration_ms=command.timeline.duration_ms,
             )
+            duration_item = next(
+                (item for item in report.technical if item.code == "DURATION"),
+                None,
+            )
+            actual_duration_ms = (
+                int(duration_item.value)
+                if duration_item and isinstance(duration_item.value, (int, float))
+                else command.timeline.duration_ms
+            )
+            duration_delta_ms = actual_duration_ms - command.timeline.duration_ms
             cover_path = output_dir / "cover.jpg"
             preview_path = output_dir / "preview.mp4"
             await self.runner.create_thumbnail(
@@ -200,6 +210,9 @@ class RenderService:
                 "sizeBytes": output_path.stat().st_size,
                 "ffmpegPresetVersion": self.settings.ffmpeg_preset_version,
                 "timelineDigest": sha256_file(plan_dir / "timeline.json"),
+                "billingTargetDurationMs": command.timeline.duration_ms,
+                "actualDurationMs": actual_duration_ms,
+                "durationDeltaMs": duration_delta_ms,
             }
             manifest_key = f"{prefix}/media-manifest.json"
             await self.store.put_json(manifest, manifest_key)
@@ -237,6 +250,9 @@ class RenderService:
                         "coverObjectKey": cover_key,
                         "previewObjectKey": preview_key,
                         "qualityObjectKey": quality_key,
+                        "billingTargetDurationMs": command.timeline.duration_ms,
+                        "actualDurationMs": actual_duration_ms,
+                        "durationDeltaMs": duration_delta_ms,
                     },
                     "updated_at": datetime.now(UTC),
                 }

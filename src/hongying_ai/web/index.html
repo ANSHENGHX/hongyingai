@@ -173,14 +173,14 @@
                   <option value="1:1">方屏 1:1</option>
                 </select>
               </label>
-              <label>成片时长
+              <label>成片时长（计费依据）
                 <select id="durationSeconds">
-                  <option value="">跟随模板（最低 15 秒）</option>
-                  <option value="15">15 秒</option>
-                  <option value="20">20 秒</option>
-                  <option value="30">30 秒</option>
-                  <option value="45">45 秒</option>
-                  <option value="60">60 秒</option>
+                  <option value="">跟随模板（误差 ≤ 0.25 秒）</option>
+                  <option value="15">15 秒（目标）</option>
+                  <option value="20">20 秒（目标）</option>
+                  <option value="30">30 秒（目标）</option>
+                  <option value="45">45 秒（目标）</option>
+                  <option value="60">60 秒（目标）</option>
                 </select>
               </label>
               <label>单镜头上限
@@ -222,6 +222,7 @@
                 <span>按文案和关键词优先匹配素材</span>
               </label>
             </div>
+            <p class="asset-tip">所选时长将作为 Timeline 硬约束和计费目标，成片技术误差控制在 ±0.25 秒；系统会按时长生成足量独立镜头，不再循环片段补时长。</p>
           </article>
 
           <article class="launch-panel">

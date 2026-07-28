@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     ark_poll_interval_seconds: float = 3.0
     ai_video_clip_duration_seconds: int = 5
     ai_video_min_clip_count: int = 3
-    ai_video_max_clip_count: int = 6
+    ai_video_max_clip_count: int = 24
     ai_video_require_motion: bool = False
 
     ffmpeg_path: str = "ffmpeg"

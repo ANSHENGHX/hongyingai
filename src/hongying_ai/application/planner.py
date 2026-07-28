@@ -230,28 +230,36 @@ class PlannerService:
     ) -> Storyboard:
         if not assets.assets or not storyboard.shots:
             return storyboard
-        shots = []
+        shots: list[StoryboardShot] = []
         remaining = target_duration_ms
         used: set[str] = set()
         source_shots = tuple(storyboard.shots)
         cursor = 0
-        max_iterations = max(len(source_shots), 1) * 12
-        while remaining > 0 and cursor < max_iterations:
+        # 一个素材在同一条成片中只匹配一次。旧逻辑在素材耗尽后继续取模，
+        # 会把同一个 5 秒生成片段反复放回时间线，形成肉眼可见的循环播放。
+        while remaining > 0 and len(used) < len(assets.assets):
             source = source_shots[cursor % len(source_shots)]
+            available = tuple(item for item in assets.assets if item.asset_id not in used)
             ranked = sorted(
-                assets.assets,
+                available,
                 key=lambda item: (
-                    _asset_match_score(source.asset_query, item, item.asset_id in used),
+                    _asset_match_score(source.asset_query, item, False),
                     item.asset_id,
                 ),
                 reverse=True,
             )
             asset = ranked[0]
             used.add(asset.asset_id)
-            duration = min(source.duration_ms, asset.duration_ms, remaining)
+            remaining_slots = max(1, len(assets.assets) - len(used) + 1)
+            balanced_duration = math.ceil(remaining / remaining_slots)
+            duration = min(
+                asset.duration_ms,
+                max(source.duration_ms, balanced_duration),
+                remaining,
+            )
             if duration <= 0:
                 break
-            shot_id = source.id if cursor < len(source_shots) else f"{source.id}_loop_{cursor + 1}"
+            shot_id = source.id if cursor < len(source_shots) else f"{source.id}_variant_{cursor + 1}"
             shots.append(
                 source.model_copy(
                     update={
@@ -262,8 +270,8 @@ class PlannerService:
                             source.asset_query, asset, False
                         ),
                         "explain": (
-                            "按标签、画面质量、授权、可用时长和素材去重规则匹配；"
-                            "当模型分镜不足目标时长时自动循环补足"
+                            "按标签、画面质量、授权和可用时长匹配；"
+                            "同一条成片内禁止重复使用同一素材"
                         ),
                     }
                 )

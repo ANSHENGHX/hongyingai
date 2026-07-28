@@ -809,23 +809,16 @@ class StudioWorkflowService:
             "应用模板并生成可执行 Timeline",
         )
         narration_asset_id = state.get("narration_asset_id")
-        narration_duration_ms = 0
-        if narration_asset_id:
-            narration = state["manifest"].by_id().get(narration_asset_id)
-            narration_duration_ms = narration.duration_ms if narration else 0
-        target_duration_ms = min(
-            90_000,
-            max(template.duration_ms, narration_duration_ms),
-        )
-        effective_template = (
-            replace(template, duration_ms=target_duration_ms)
-            if target_duration_ms != template.duration_ms
-            else template
-        )
+        # 用户选择的时长是计费目标，也是 Timeline 的硬约束。配音过长时由
+        # 模板在目标时长处截断，不能再反向把成片撑长。
+        target_duration_ms = template.duration_ms
+        effective_template = template
         storyboard = _apply_clip_duration_limit(
             state["storyboard"],
+            state["manifest"],
             request.options.clip_duration_seconds * 1000,
-            target_duration_ms + effective_template.transition_ms * 8,
+            target_duration_ms,
+            0 if effective_template.transition == "cut" else effective_template.transition_ms,
         )
         timeline = apply_template(
             state["base_timeline"],
@@ -1032,7 +1025,11 @@ class StudioWorkflowService:
         work_dir = Path(mkdtemp(prefix=f"studio-ai-video-{tenant_id}-", dir=self.settings.app_work_dir))
         try:
             clip_duration = max(4, min(12, self.settings.ai_video_clip_duration_seconds))
-            clip_count = _ai_video_clip_count(self.settings, template)
+            clip_count = _ai_video_clip_count(
+                self.settings,
+                template,
+                requested_clip_seconds=request.options.clip_duration_seconds,
+            )
             prompts = _ai_scene_video_prompts(request, template, clip_count)
             image_references = tuple(asset for asset in reference_assets if asset.media_type == "image")
             if request.options.generation_direction == "avatar_product_pitch" and request.avatar_asset_id:
@@ -1110,9 +1107,20 @@ class StudioWorkflowService:
         work_dir = Path(mkdtemp(prefix=f"studio-ai-image-{tenant_id}-", dir=self.settings.app_work_dir))
         try:
             scene_count = (
-                5
+                max(
+                    5,
+                    _ai_video_clip_count(
+                        self.settings,
+                        template,
+                        requested_clip_seconds=request.options.clip_duration_seconds,
+                    ),
+                )
                 if request.options.generation_direction in {"knowledge_stickman", "knowledge_pencil"}
-                else _ai_video_clip_count(self.settings, template)
+                else _ai_video_clip_count(
+                    self.settings,
+                    template,
+                    requested_clip_seconds=request.options.clip_duration_seconds,
+                )
             )
             prompts = _ai_scene_image_prompts(request, template, scene_count)
             local_images = await self.image_generator.generate_images(
@@ -1528,27 +1536,79 @@ def _infer_generation_direction(goal: str, activity_type: str) -> str:
 
 def _apply_clip_duration_limit(
     storyboard: Any,
+    manifest: InputManifest,
     max_duration_ms: int,
     target_duration_ms: int,
+    transition_ms: int = 0,
 ) -> Any:
     if max_duration_ms <= 0:
         return storyboard
-    source_shots = tuple(storyboard.shots)
+    assets = manifest.by_id()
+    source_shots = tuple(
+        shot
+        for shot in storyboard.shots
+        if shot.selected_asset_id and shot.selected_asset_id in assets
+    )
     if not source_shots:
         return storyboard
+    unique_shots = []
+    seen_asset_ids: set[str] = set()
+    for shot in source_shots:
+        if shot.selected_asset_id in seen_asset_ids:
+            continue
+        seen_asset_ids.add(shot.selected_asset_id)
+        unique_shots.append(shot)
+
+    # 长视频允许被切成多个连续、互不重叠的源区间；短生成片则每条通常
+    # 只贡献一个镜头。apply_template 会按素材累计 sourceInMs。
     shots = []
-    remaining = max(1, target_duration_ms)
-    cursor = 0
-    max_iterations = max(len(source_shots), 1) * 16
-    while remaining > 0 and cursor < max_iterations:
-        source = source_shots[cursor % len(source_shots)]
-        duration = min(source.duration_ms, max_duration_ms, remaining)
-        if duration <= 0:
+    consumed_by_asset: dict[str, int] = {shot.selected_asset_id: 0 for shot in unique_shots}
+    visible_duration_ms = 0
+    pass_index = 0
+    while visible_duration_ms < target_duration_ms:
+        added = False
+        for source in unique_shots:
+            asset_id = source.selected_asset_id
+            asset = assets[asset_id]
+            consumed = consumed_by_asset[asset_id]
+            available = asset.duration_ms - consumed
+            duration = min(max_duration_ms, available)
+            if duration <= transition_ms:
+                continue
+            contribution = duration if not shots else duration - transition_ms
+            remaining_visible = target_duration_ms - visible_duration_ms
+            if contribution > remaining_visible:
+                duration -= contribution - remaining_visible
+                contribution = remaining_visible
+            if duration <= transition_ms:
+                continue
+            segment_index = 1 + sum(
+                1 for shot in shots if shot.selected_asset_id == asset_id
+            )
+            shots.append(
+                source.model_copy(
+                    update={
+                        "id": (
+                            source.id
+                            if segment_index == 1
+                            else f"{source.id}_segment_{segment_index}"
+                        ),
+                        "duration_ms": duration,
+                        "explain": (
+                            f"{source.explain or '素材规则匹配'}；"
+                            f"使用第 {segment_index} 个连续非重复源区间"
+                        ),
+                    }
+                )
+            )
+            consumed_by_asset[asset_id] = consumed + duration
+            visible_duration_ms += contribution
+            added = True
+            if visible_duration_ms >= target_duration_ms:
+                break
+        pass_index += 1
+        if not added or pass_index > 64:
             break
-        shot_id = source.id if cursor < len(source_shots) else f"{source.id}_cap_loop_{cursor + 1}"
-        shots.append(source.model_copy(update={"id": shot_id, "duration_ms": duration}))
-        remaining -= duration
-        cursor += 1
     return storyboard.model_copy(update={"shots": tuple(shots)})
 
 
@@ -1603,13 +1663,28 @@ def _aspect_ratio(template: VideoTemplate) -> str:
     return "9:16" if template.height > template.width else "16:9"
 
 
-def _ai_video_clip_count(settings: Settings, template: VideoTemplate) -> int:
-    clip_duration_ms = max(4, min(12, settings.ai_video_clip_duration_seconds)) * 1000
-    count = max(
-        settings.ai_video_min_clip_count,
-        (template.duration_ms + clip_duration_ms - 1) // clip_duration_ms,
-    )
-    return max(1, min(settings.ai_video_max_clip_count, count))
+def _ai_video_clip_count(
+    settings: Settings,
+    template: VideoTemplate,
+    *,
+    requested_clip_seconds: int | None = None,
+) -> int:
+    generated_seconds = max(4, min(12, settings.ai_video_clip_duration_seconds))
+    usable_seconds = min(generated_seconds, requested_clip_seconds or generated_seconds)
+    usable_ms = max(1000, usable_seconds * 1000)
+    overlap_ms = 0 if template.transition == "cut" else template.transition_ms
+    first_contribution = usable_ms
+    later_contribution = max(500, usable_ms - overlap_ms)
+    required = 1
+    if template.duration_ms > first_contribution:
+        required += (
+            template.duration_ms - first_contribution + later_contribution - 1
+        ) // later_contribution
+    count = max(settings.ai_video_min_clip_count, required)
+    # 60 秒、3 秒镜头最多约需 23 个独立镜头。这里宁可增加独立生成
+    # 次数，也不能通过循环一个片段来伪造目标时长。
+    safety_limit = max(24, settings.ai_video_max_clip_count)
+    return max(1, min(safety_limit, count))
 
 
 def _ai_scene_video_prompts(
@@ -1650,15 +1725,42 @@ def _ai_scene_video_prompts(
         (f"生成补充镜头，关键词：{', '.join(points[:4])}。视觉风格与前面一致，有传播感、真实感、商业可用。"),
     ]
     if request.options.generation_direction == "avatar_product_pitch":
-        pitch_lines = tuple(
-            part.strip() for part in re.split(r"(?<=[。！？!?；;])", script) if part.strip()
-        ) or (script,)
+        pitch_lines = _split_script_for_scenes(script, clip_count)
+        motion_plans = (
+            "正面胸像，先稳定直视镜头，再自然眨眼一次，句末轻微点头；双手不入镜",
+            "左前方约十度半侧身，视线回到镜头，右手只做一次小幅产品指引动作",
+            "正面近景，肩颈放松，连续自然说话，句中轻微抬眉，手部保持静止",
+            "右前方约十度半侧身，左手托住产品，句末轻微微笑，不做重复手势",
+            "中近景稳定机位，身体轻微前倾强调重点，再回到自然站姿",
+            "正面特写收尾，目光稳定、一次轻点头，嘴型结束后保持自然微笑",
+        )
         scenes = [
             (
-                "参考照片中的同一人物正面面对镜头，以强钩子开场介绍产品；"
-                f"本镜头口播语义：{pitch_lines[index % len(pitch_lines)][:90]}。"
-                "人物自然眨眼、嘴部连续说话、轻微点头和手势，胸像景别，镜头稳定轻推；"
-                "保持五官、发型、服装和背景连续一致，产品可自然拿在手中或摆在身旁。"
+                f"人物口播第 {index + 1}/{clip_count} 个独立镜头。"
+                f"本镜头唯一口播内容：{pitch_lines[index][:100]}。"
+                f"本镜头动作方案：{motion_plans[index % len(motion_plans)]}。"
+                "嘴唇持续按这段中文的音节自然开合，停顿位置与标点一致，不能只张合一次；"
+                "动作幅度小且真实，不复用上一镜头的动作轨迹，不摇摆、不抽动、不循环；"
+                "保持同一人物的五官、年龄、发型、服装、产品和背景连续一致，镜头稳定。"
+            )
+            for index in range(clip_count)
+        ]
+    else:
+        camera_plans = (
+            "独立广角建立镜头，缓慢向前推进",
+            "独立中景横向小幅移动，突出主体与环境关系",
+            "独立近景细节镜头，只做一次平滑拉近",
+            "独立低机位展示镜头，主体动作自然完整",
+            "独立俯拍细节镜头，构图简洁",
+            "独立收尾镜头，稳定后轻微拉远并预留 CTA 区域",
+        )
+        scenes = [
+            (
+                f"{scenes[index % len(scenes)]}"
+                f"这是第 {index + 1}/{clip_count} 个独立镜头，镜头设计："
+                f"{camera_plans[index % len(camera_plans)]}。"
+                "内容、机位、动作起止和背景细节必须与前后镜头有明确差异；"
+                "禁止复制、倒放、循环或换色复用任何已有片段。"
             )
             for index in range(clip_count)
         ]
@@ -1671,6 +1773,34 @@ def _ai_scene_video_prompts(
         "所有镜头必须风格统一、主体连续、商业可用，不要随机素材混剪。"
     )
     return tuple(f"{prompt_prefix}{scene}" for scene in scenes[:clip_count])
+
+
+def _split_script_for_scenes(script: str, scene_count: int) -> tuple[str, ...]:
+    normalized = " ".join(script.split()).strip() or "请自然介绍本次产品和核心卖点。"
+    sentences = [
+        part.strip()
+        for part in re.split(r"(?<=[。！？!?；;])", normalized)
+        if part.strip()
+    ]
+    if len(sentences) >= scene_count:
+        groups = [[] for _ in range(scene_count)]
+        for index, sentence in enumerate(sentences):
+            groups[min(scene_count - 1, index * scene_count // len(sentences))].append(sentence)
+        return tuple("".join(group)[:120] for group in groups)
+
+    # 文案只有一两句话时按字符均匀拆分，避免每个生成请求收到完全相同的全文。
+    size = max(1, (len(normalized) + scene_count - 1) // scene_count)
+    chunks = [
+        normalized[index : index + size].strip()
+        for index in range(0, len(normalized), size)
+        if normalized[index : index + size].strip()
+    ]
+    if not chunks:
+        chunks = [normalized]
+    return tuple(
+        chunks[index] if index < len(chunks) else f"{normalized[:80]}（镜头重点 {index + 1}）"
+        for index in range(scene_count)
+    )
 
 
 def _ai_scene_image_prompts(
@@ -1704,11 +1834,23 @@ def _ai_scene_image_prompts(
         "画面需可直接商用、构图清楚、主体完整、留出字幕安全区；"
         "禁止文字、二维码、电话、网址、平台 Logo、水印、测试彩条和随机拼贴。"
     )
-    return tuple(
-        f"{common} 当前分镜 {index + 1}/{min(scene_count, len(scenes))}："
-        f"{kicker}，{headline}。必须与前后分镜形成连续叙事。"
-        for index, (kicker, headline) in enumerate(scenes[:scene_count])
+    composition_variants = (
+        "广角建立场景",
+        "中景展示主体关系",
+        "近景突出关键细节",
+        "侧面构图推进故事",
+        "俯拍构图总结信息",
+        "留白构图完成行动引导",
     )
+    prompts = []
+    for index in range(scene_count):
+        kicker, headline = scenes[index % len(scenes)]
+        prompts.append(
+            f"{common} 当前分镜 {index + 1}/{scene_count}：{kicker}，{headline}。"
+            f"本张采用{composition_variants[index % len(composition_variants)]}；"
+            "必须与前后分镜形成连续叙事，但人物动作、机位和背景细节不能重复。"
+        )
+    return tuple(prompts)
 
 
 def _fallback_visual_scenes(

@@ -92,6 +92,7 @@ async def test_planner_extends_short_model_storyboard_to_target_duration() -> No
         assets=manifest,
     )
 
-    assert sum(shot.duration_ms for shot in storyboard.shots) == 30_000
-    assert timeline.duration_ms == 30_000
-    assert len(storyboard.shots) > 3
+    assert sum(shot.duration_ms for shot in storyboard.shots) == 16_000
+    assert timeline.duration_ms == 16_000
+    assert len(storyboard.shots) == 2
+    assert len({shot.selected_asset_id for shot in storyboard.shots}) == 2
